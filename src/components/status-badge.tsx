@@ -23,6 +23,12 @@ const STATUS_VARIANT: Record<string, Variant> = {
   TODO: "secondary",
   IDLE: "secondary",
   PAUSED: "warning",
+  // Approvals & AI sessions
+  PENDING: "warning",
+  APPROVED: "success",
+  CHANGES_REQUESTED: "warning",
+  QUEUED: "secondary",
+  FAILED: "danger",
   // Problem states
   BLOCKED: "danger",
   ERROR: "danger",

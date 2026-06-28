@@ -1,14 +1,21 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import {
-  FolderKanban,
   Target,
+  ShieldCheck,
   Bot,
-  CheckCircle2,
+  Ban,
   Activity,
+  CalendarClock,
+  TrendingUp,
+  HeartPulse,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { FadeIn } from "@/components/motion/fade-in";
+import { EmptyState } from "@/components/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { ActivityFeed } from "@/components/mission/activity-feed";
+import { HealthBadge } from "@/components/mission/health-badge";
 import {
   Card,
   CardContent,
@@ -17,150 +24,261 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { StatusBadge, PriorityBadge } from "@/components/status-badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import {
-  mockMissions,
-  mockAgents,
-  mockActivity,
-  mockProjects,
-} from "@/lib/mock-data";
-import { getInitials } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/status-badge";
+import { getActiveWorkspace } from "@/lib/active-workspace";
+import { dashboardService } from "@/server/services";
+import type { MissionHealth } from "@/types";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Command Center" };
 
-export default function CommandCenterPage() {
-  const activeMissions = mockMissions.filter((m) => m.status === "ACTIVE");
+const HEALTH_ORDER: MissionHealth[] = [
+  "ON_TRACK",
+  "AT_RISK",
+  "OFF_TRACK",
+  "BLOCKED",
+  "UNKNOWN",
+];
+
+const HEALTH_BAR: Record<MissionHealth, string> = {
+  ON_TRACK: "bg-emerald-500",
+  AT_RISK: "bg-amber-500",
+  OFF_TRACK: "bg-red-500",
+  BLOCKED: "bg-red-500",
+  UNKNOWN: "bg-zinc-400",
+};
+
+function formatDate(value: Date | string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export default async function CommandCenterPage() {
+  const workspace = await getActiveWorkspace();
+  if (!workspace) {
+    return (
+      <EmptyState
+        icon={Target}
+        title="No workspace yet"
+        description="Create a workspace to see your command center."
+      />
+    );
+  }
+
+  const data = await dashboardService.getOverview(workspace.id);
+  const healthTotal = HEALTH_ORDER.reduce(
+    (sum, key) => sum + data.health[key],
+    0,
+  );
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Command Center"
-        description="Your operational overview across projects, missions and agents."
-        actions={<Button>New mission</Button>}
+        description="Live operational overview of missions, approvals and AI execution."
       />
 
-      {/* KPI row */}
+      {/* KPIs */}
       <FadeIn>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            label="Active projects"
-            value={mockProjects.filter((p) => p.status === "ACTIVE").length}
-            icon={FolderKanban}
-            trend={{ value: "+2 this month", positive: true }}
-          />
-          <StatCard
-            label="Missions in flight"
-            value={activeMissions.length}
-            icon={Target}
-            trend={{ value: "+5%", positive: true }}
-          />
-          <StatCard
-            label="Agents online"
-            value={mockAgents.filter((a) => a.status !== "DISABLED").length}
-            icon={Bot}
-          />
-          <StatCard
-            label="Tasks completed"
-            value={128}
-            icon={CheckCircle2}
-            trend={{ value: "+18 this week", positive: true }}
-          />
+          <StatCard label="Active missions" value={data.counts.activeMissions} icon={Target} />
+          <StatCard label="Approvals waiting" value={data.counts.pendingApprovals} icon={ShieldCheck} />
+          <StatCard label="AI sessions running" value={data.counts.activeAiSessions} icon={Bot} />
+          <StatCard label="Blocked missions" value={data.counts.blockedMissions} icon={Ban} />
         </div>
       </FadeIn>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Missions */}
+        {/* Mission progress */}
         <FadeIn delay={0.05} className="lg:col-span-2">
           <Card className="h-full">
             <CardHeader className="flex-row items-center justify-between">
               <div>
-                <CardTitle>Active missions</CardTitle>
-                <CardDescription>
-                  Progress across your highest-priority objectives.
-                </CardDescription>
+                <CardTitle>Mission progress</CardTitle>
+                <CardDescription>Active and blocked missions by priority.</CardDescription>
               </div>
-              <Target className="h-5 w-5 text-muted-foreground" />
+              <TrendingUp className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="space-y-5">
-              {activeMissions.map((mission) => (
-                <div key={mission.id} className="space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{mission.title}</span>
-                      <PriorityBadge priority={mission.priority} />
+            <CardContent className="space-y-4">
+              {data.missions.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No active missions.
+                </p>
+              ) : (
+                data.missions.map((mission) => (
+                  <Link
+                    key={mission.id}
+                    href={`/missions/${mission.id}`}
+                    className="block space-y-2 rounded-lg p-2 transition-colors hover:bg-accent/50"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Badge variant="outline" className="font-mono">
+                          {mission.project.key}
+                        </Badge>
+                        <span className="truncate text-sm font-medium">
+                          {mission.title}
+                        </span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <HealthBadge health={mission.health} />
+                        <span className="text-sm text-muted-foreground">
+                          {mission.progress}%
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-sm text-muted-foreground">
-                      {mission.progress}%
-                    </span>
-                  </div>
-                  <Progress value={mission.progress} />
-                </div>
-              ))}
+                    <Progress value={mission.progress} />
+                  </Link>
+                ))
+              )}
             </CardContent>
           </Card>
         </FadeIn>
 
-        {/* Activity */}
+        {/* Mission health */}
         <FadeIn delay={0.1}>
           <Card className="h-full">
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle>Recent activity</CardTitle>
-              <Activity className="h-5 w-5 text-muted-foreground" />
+              <CardTitle>Mission health</CardTitle>
+              <HeartPulse className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent className="space-y-4">
-              {mockActivity.map((item) => (
-                <div key={item.id} className="flex items-start gap-3">
-                  <Avatar className="h-7 w-7">
-                    <AvatarFallback className="text-[10px]">
-                      {getInitials(item.actor)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-0.5 text-sm">
-                    <p>
-                      <span className="font-medium">{item.actor}</span>{" "}
-                      <span className="text-muted-foreground">
-                        {item.action}
-                      </span>{" "}
-                      <span className="font-medium">{item.target}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">{item.at}</p>
-                  </div>
-                </div>
-              ))}
+              {healthTotal === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No missions in flight.
+                </p>
+              ) : (
+                HEALTH_ORDER.map((key) => {
+                  const count = data.health[key];
+                  const pct = healthTotal > 0 ? (count / healthTotal) * 100 : 0;
+                  return (
+                    <div key={key} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <HealthBadge health={key} />
+                        <span className="text-sm text-muted-foreground">{count}</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                        <div
+                          className={`h-full ${HEALTH_BAR[key]}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </CardContent>
           </Card>
         </FadeIn>
       </div>
 
-      {/* Agent fleet */}
-      <FadeIn delay={0.15}>
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Upcoming deadlines */}
+        <FadeIn delay={0.05}>
+          <Card className="h-full">
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle>Upcoming deadlines</CardTitle>
+              <CalendarClock className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {data.upcomingDeadlines.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  Nothing due soon.
+                </p>
+              ) : (
+                data.upcomingDeadlines.map((mission) => (
+                  <Link
+                    key={mission.id}
+                    href={`/missions/${mission.id}`}
+                    className="flex items-center justify-between rounded-md p-2 text-sm transition-colors hover:bg-accent/50"
+                  >
+                    <span className="truncate">{mission.title}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatDate(mission.dueDate)}
+                    </span>
+                  </Link>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </FadeIn>
+
+        {/* Approvals waiting */}
+        <FadeIn delay={0.1}>
+          <Card className="h-full">
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle>Approvals waiting</CardTitle>
+              <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {data.approvalsWaiting.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No approvals pending.
+                </p>
+              ) : (
+                data.approvalsWaiting.map((approval) => (
+                  <Link
+                    key={approval.id}
+                    href={`/missions/${approval.mission.id}`}
+                    className="block space-y-1 rounded-md p-2 transition-colors hover:bg-accent/50"
+                  >
+                    <p className="truncate text-sm font-medium">{approval.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {approval.mission.title}
+                    </p>
+                  </Link>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </FadeIn>
+
+        {/* AI sessions */}
+        <FadeIn delay={0.15}>
+          <Card className="h-full">
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle>AI sessions</CardTitle>
+              <Bot className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {data.aiSessions.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No running sessions.
+                </p>
+              ) : (
+                data.aiSessions.map((session) => (
+                  <Link
+                    key={session.id}
+                    href={`/missions/${session.mission.id}`}
+                    className="flex items-center justify-between rounded-md p-2 transition-colors hover:bg-accent/50"
+                  >
+                    <span className="truncate text-sm">{session.title}</span>
+                    <StatusBadge status={session.status} />
+                  </Link>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </FadeIn>
+      </div>
+
+      {/* Recent activity */}
+      <FadeIn delay={0.1}>
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <div>
-              <CardTitle>Agent fleet</CardTitle>
-              <CardDescription>
-                Specialized AI agents available in this workspace.
-              </CardDescription>
+              <CardTitle>Recent activity</CardTitle>
+              <CardDescription>The latest events across every mission.</CardDescription>
             </div>
-            <Bot className="h-5 w-5 text-muted-foreground" />
+            <Activity className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {mockAgents.map((agent) => (
-              <div
-                key={agent.id}
-                className="rounded-lg border p-4 transition-colors hover:bg-accent/50"
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="font-medium">{agent.name}</span>
-                  <StatusBadge status={agent.status} />
-                </div>
-                <p className="line-clamp-2 text-xs text-muted-foreground">
-                  {agent.description}
-                </p>
-              </div>
-            ))}
+          <CardContent>
+            <ActivityFeed items={data.recentActivity} />
           </CardContent>
         </Card>
       </FadeIn>

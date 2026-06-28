@@ -1,91 +1,107 @@
 # RNZ OS — Folder tree
 
-Annotated map of the foundation. The structure encodes the layered
-architecture (see `ARCHITECTURE.md`): UI → API → services → repositories → data.
+Annotated map of the codebase. The structure encodes the layered architecture
+(see `ARCHITECTURE.md`): UI → API → controllers → services (+ policies/events)
+→ repositories → data. The **Mission Engine** is the center of gravity.
 
 ```
 rnz-os/
 ├── prisma/
-│   ├── schema.prisma            # All models, enums, indexes, relations
-│   └── seed.ts                  # Demo workspace/user/project/mission/agent
+│   ├── schema.prisma            # Models, enums, indexes — Mission Engine core
+│   ├── seed.ts                  # Realistic mission-centric demo data
+│   └── migrations/
+│       ├── migration_lock.toml
+│       └── 20260628170000_mission_engine_init/migration.sql
 │
 ├── src/
-│   ├── app/                     # Next.js App Router
-│   │   ├── layout.tsx           # Root layout: fonts + Providers
-│   │   ├── page.tsx             # Redirects to /command-center
-│   │   ├── globals.css          # Design tokens (light/dark) + base styles
-│   │   │
-│   │   ├── (auth)/              # Public auth route group
-│   │   │   ├── layout.tsx       # Split-screen brand + form shell
-│   │   │   ├── login/page.tsx
-│   │   │   └── register/page.tsx
-│   │   │
-│   │   ├── (dashboard)/         # Authenticated app shell route group
-│   │   │   ├── layout.tsx       # Sidebar + TopNav + scroll region
-│   │   │   ├── command-center/page.tsx
-│   │   │   ├── projects/page.tsx
-│   │   │   ├── missions/page.tsx
-│   │   │   ├── agents/page.tsx
+│   ├── app/
+│   │   ├── (auth)/              # Public auth route group (login, register)
+│   │   ├── (dashboard)/         # Authenticated app shell
+│   │   │   ├── command-center/page.tsx     # Dashboard (live aggregates)
+│   │   │   ├── missions/page.tsx            # Mission list (live)
+│   │   │   ├── missions/[missionId]/page.tsx # Mission Workspace (live)
+│   │   │   ├── projects/page.tsx            # (mock — pending wiring)
+│   │   │   ├── agents/page.tsx              # (mock — pending wiring)
 │   │   │   └── settings/page.tsx
 │   │   │
-│   │   └── api/                 # HTTP boundary (route handlers)
-│   │       ├── auth/
-│   │       │   ├── [...nextauth]/route.ts   # Auth.js handlers
-│   │       │   └── register/route.ts        # Sign-up + default workspace
-│   │       └── workspaces/
-│   │           ├── route.ts                          # GET list / POST create
-│   │           └── [workspaceId]/
-│   │               ├── projects/route.ts             # GET / POST
-│   │               ├── projects/[projectId]/route.ts # GET / PATCH / DELETE
-│   │               ├── missions/route.ts             # GET / POST
-│   │               ├── agents/route.ts               # GET / POST
-│   │               └── agents/[agentId]/route.ts     # GET / PATCH / DELETE
+│   │   └── api/
+│   │       ├── auth/**                              # Auth.js + register
+│   │       └── workspaces/[workspaceId]/
+│   │           ├── dashboard/route.ts               # GET overview
+│   │           ├── projects/**                      # projects CRUD
+│   │           ├── agents/**                        # agents CRUD
+│   │           └── missions/
+│   │               ├── route.ts                     # GET list / POST create
+│   │               └── [missionId]/
+│   │                   ├── route.ts                 # GET aggregate / PATCH / DELETE
+│   │                   ├── recompute/route.ts       # POST recompute rollups
+│   │                   ├── context/route.ts         # PATCH working context
+│   │                   ├── milestones/route.ts      # POST milestone
+│   │                   ├── activity/route.ts        # GET timeline
+│   │                   ├── approvals/route.ts       # GET / POST
+│   │                   ├── approvals/[approvalId]/route.ts   # PATCH decide
+│   │                   ├── notes/route.ts           # GET / POST
+│   │                   ├── dependencies/route.ts    # POST
+│   │                   ├── metrics/route.ts         # GET / POST
+│   │                   ├── ai-sessions/route.ts     # GET / POST
+│   │                   └── ai-sessions/[sessionId]/route.ts  # PATCH
 │   │
 │   ├── components/
-│   │   ├── ui/                  # shadcn/ui primitives (button, card, …)
-│   │   ├── layout/              # sidebar, top-nav, workspace-switcher, user-menu
-│   │   ├── auth/                # login-form, register-form
-│   │   ├── dashboard/           # stat-card and other dashboard widgets
-│   │   ├── settings/            # appearance-settings
-│   │   ├── motion/              # framer-motion wrappers (fade-in)
-│   │   ├── providers/           # Session + React Query + Theme providers
-│   │   ├── page-header.tsx      # Shared page title block
-│   │   ├── status-badge.tsx     # Centralized status/priority → badge mapping
+│   │   ├── ui/                  # shadcn/ui primitives (+ textarea)
+│   │   ├── layout/              # sidebar, top-nav, workspace-switcher…
+│   │   ├── mission/             # Mission Engine UI
+│   │   │   ├── mission-workspace.tsx   # Command-center: 14 sectioned tabs
+│   │   │   ├── mission-header.tsx      # Lifecycle controls (status/recompute)
+│   │   │   ├── activity-feed.tsx       # Append-only timeline renderer
+│   │   │   ├── approvals-panel.tsx     # Approve / reject / request changes
+│   │   │   ├── ai-sessions-panel.tsx   # Start + list AI sessions
+│   │   │   ├── notes-panel.tsx         # Add + list notes
+│   │   │   └── health-badge.tsx        # Health signal indicator
+│   │   ├── dashboard/           # stat-card
+│   │   ├── auth/ · settings/ · motion/ · providers/
+│   │   ├── page-header.tsx · status-badge.tsx · empty-state.tsx
 │   │   └── theme-toggle.tsx
 │   │
-│   ├── server/                  # Backend, framework-agnostic
-│   │   ├── repositories/        # Prisma data access (one per aggregate)
-│   │   ├── services/            # Business logic + authorization
-│   │   │   └── access.ts        # requireUser / requireMembership guards
-│   │   ├── errors.ts            # Typed domain errors (App/NotFound/Forbidden…)
-│   │   └── http.ts              # ok() / route() / handleError() helpers
+│   ├── server/                  # Backend (framework-agnostic)
+│   │   ├── controllers/
+│   │   │   └── mission.controller.ts   # HTTP↔service mapping for all sub-resources
+│   │   ├── policies/
+│   │   │   └── mission.policy.ts        # Role-ranked capability checks
+│   │   ├── events/
+│   │   │   └── mission-events.ts        # Activity dispatcher + live-update seam
+│   │   ├── services/
+│   │   │   ├── mission.service.ts        # Lifecycle, rollups, context, milestones
+│   │   │   ├── mission-access.ts         # Shared tenancy+capability guard
+│   │   │   ├── mission-activity.service.ts
+│   │   │   ├── mission-approval.service.ts
+│   │   │   ├── mission-note.service.ts
+│   │   │   ├── mission-dependency.service.ts
+│   │   │   ├── mission-metric.service.ts
+│   │   │   ├── ai-session.service.ts
+│   │   │   ├── dashboard.service.ts      # Workspace command-center aggregates
+│   │   │   ├── workspace/project/agent.service.ts
+│   │   │   └── access.ts                 # requireUser / requireMembership
+│   │   ├── repositories/        # Prisma only here (one per aggregate)
+│   │   │   ├── mission.repository.ts      # core + aggregate + rollups
+│   │   │   ├── mission-activity / -approval / -note / -dependency / -metric
+│   │   │   ├── ai-session.repository.ts
+│   │   │   ├── dashboard.repository.ts    # indexed dashboard queries
+│   │   │   └── workspace/project/agent.repository.ts
+│   │   ├── errors.ts            # Typed domain errors
+│   │   └── http.ts              # ok() / route() / handleError()
 │   │
-│   ├── hooks/                   # React Query hooks (use-projects, use-agents…)
-│   ├── lib/                     # Cross-cutting infrastructure
-│   │   ├── prisma.ts            # Singleton Prisma client
-│   │   ├── auth.ts              # Auth.js (Node): adapter + credentials
-│   │   ├── auth.config.ts       # Auth.js (Edge-safe) for middleware
-│   │   ├── env.ts               # Zod-validated environment variables
-│   │   ├── queue.ts             # BullMQ registry (PREPARED, inactive)
-│   │   ├── api-client.ts        # Typed fetch wrapper for hooks
-│   │   ├── mock-data.ts         # Fixtures powering the UI today
-│   │   └── utils.ts             # cn, slugify, getInitials, formatRelativeTime
-│   │
-│   ├── validations/             # Zod schemas (auth, workspace, project, …)
-│   ├── types/                   # Domain types + next-auth augmentation
-│   ├── config/                  # navigation.ts, site.ts
-│   └── middleware.ts            # Edge auth gate for all app routes
+│   ├── hooks/                   # React Query + mission action hooks
+│   │   ├── use-mission-actions.ts        # Mission Workspace mutations
+│   │   └── use-projects / use-agents / use-missions.ts
+│   ├── lib/
+│   │   ├── prisma · auth · auth.config · env · queue · api-client · utils
+│   │   ├── active-workspace.ts  # Resolve active workspace (server)
+│   │   └── mock-data.ts         # Projects/Agents fixtures (pending wiring)
+│   ├── validations/             # Zod (mission, mission-engine, …)
+│   ├── types/ · config/
+│   └── middleware.ts            # Edge auth gate
 │
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── FOLDER_TREE.md           # (this file)
-│   ├── TODO.md
-│   └── SPRINT_1.md
-│
-├── components.json              # shadcn/ui config
-├── tailwind.config.ts
-├── next.config.ts
-├── tsconfig.json
-├── .env.example
-└── package.json
+└── docs/
+    ├── ARCHITECTURE.md · FOLDER_TREE.md (this) · TODO.md
+    ├── SPRINT_1.md · SPRINT_2.md
 ```

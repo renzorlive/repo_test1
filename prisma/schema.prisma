@@ -109,20 +109,102 @@ enum ArtifactType {
   OTHER
 }
 
+// ---- Mission Engine enums ---------------------------------------------------
+
+/// Operational health of a mission, distinct from its lifecycle status.
+enum MissionHealth {
+  ON_TRACK
+  AT_RISK
+  OFF_TRACK
+  BLOCKED
+  UNKNOWN
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+/// Who or what produced an activity / acted on a mission.
+enum ActorType {
+  USER
+  AGENT
+  SYSTEM
+}
+
+/// Append-only event taxonomy for the mission activity timeline.
+enum ActivityType {
+  MISSION_CREATED
+  MISSION_UPDATED
+  MISSION_STATUS_CHANGED
+  MISSION_HEALTH_CHANGED
+  MISSION_COMPLETED
+  EPIC_CREATED
+  TASK_CREATED
+  TASK_COMPLETED
+  DECISION_ADDED
+  ARTIFACT_UPLOADED
+  AI_SESSION_STARTED
+  AI_SESSION_COMPLETED
+  AI_SESSION_FAILED
+  APPROVAL_REQUESTED
+  APPROVAL_ACCEPTED
+  APPROVAL_REJECTED
+  APPROVAL_CHANGES_REQUESTED
+  REVIEW_FAILED
+  NOTE_ADDED
+  DEPENDENCY_ADDED
+  METRIC_RECORDED
+  EXECUTION_STARTED
+  EXECUTION_COMPLETED
+}
+
+enum AiSessionStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum DependencyType {
+  BLOCKS
+  BLOCKED_BY
+  RELATES_TO
+}
+
+enum TimelineStatus {
+  PLANNED
+  ACTIVE
+  DONE
+  SKIPPED
+}
+
 // ----------------------------------------------------------------------------
 // Identity & tenancy
 // ----------------------------------------------------------------------------
 
 model Workspace {
-  id        String  @id @default(cuid())
-  name      String
-  slug      String  @unique
-  imageUrl  String?
+  id       String  @id @default(cuid())
+  name     String
+  slug     String  @unique
+  imageUrl String?
   // Free-form JSON settings (theme, feature flags, billing tier, etc.).
-  settings  Json    @default("{}")
+  settings Json    @default("{}")
 
   memberships Membership[]
   projects    Project[]
+  missions    Mission[]
   agents      Agent[]
   workflows   Workflow[]
 
@@ -142,11 +224,18 @@ model User {
   // Hashed password for the credentials provider (nullable for OAuth users).
   passwordHash  String?   @map("password_hash")
 
-  memberships    Membership[]
-  accounts       Account[]
-  sessions       Session[]
-  assignedTasks  Task[]       @relation("TaskAssignee")
-  authoredDecisions Decision[] @relation("DecisionAuthor")
+  memberships       Membership[]
+  accounts          Account[]
+  sessions          Session[]
+  assignedTasks     Task[]       @relation("TaskAssignee")
+  authoredDecisions Decision[]   @relation("DecisionAuthor")
+
+  // Mission Engine relations
+  ownedMissions      Mission[]         @relation("MissionOwner")
+  missionNotes       MissionNote[]
+  missionActivities  MissionActivity[] @relation("ActivityActor")
+  approvalsRequested MissionApproval[] @relation("ApprovalRequester")
+  approvalsReviewed  MissionApproval[] @relation("ApprovalReviewer")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -184,7 +273,7 @@ model Project {
   color       String?
   workspaceId String        @map("workspace_id")
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   missions  Mission[]
   epics     Epic[]
   tasks     Task[]
@@ -199,24 +288,65 @@ model Project {
   @@map("projects")
 }
 
+/// The Mission is the central domain object of RNZ OS. Every execution
+/// entity (epics, tasks, AI sessions, decisions, artifacts, approvals,
+/// metrics, dependencies and activity) hangs off a mission. `workspaceId` is
+/// denormalized from the parent project so workspace-scoped dashboards stay a
+/// single indexed read at scale.
 model Mission {
-  id          String        @id @default(cuid())
-  title       String
-  summary     String?
-  status      MissionStatus @default(DRAFT)
-  priority    Priority      @default(MEDIUM)
-  progress    Int           @default(0) // 0-100 derived/rollup value
-  dueDate     DateTime?     @map("due_date")
-  projectId   String        @map("project_id")
+  id        String  @id @default(cuid())
+  title     String
+  summary   String?
+  objective String? // the business objective this mission exists to achieve
+  outcome   String? // the realized result, filled as the mission completes
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  epics   Epic[]
+  status   MissionStatus @default(DRAFT)
+  health   MissionHealth @default(UNKNOWN)
+  priority Priority      @default(MEDIUM)
+  progress Int           @default(0) // 0-100 rollup derived from tasks
+
+  // Time & cost envelope — the basis for execution analytics.
+  startedAt      DateTime? @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+  dueDate        DateTime? @map("due_date")
+  estimatedHours Float?    @map("estimated_hours")
+  actualHours    Float?    @map("actual_hours")
+  estimatedCost  Float?    @map("estimated_cost")
+  actualCost     Float?    @map("actual_cost")
+
+  projectId   String  @map("project_id")
+  workspaceId String  @map("workspace_id")
+  ownerId     String? @map("owner_id")
+
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner     User?     @relation("MissionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  // Execution graph — everything belongs to the mission.
+  epics        Epic[]
+  tasks        Task[]
+  decisions    Decision[]
+  artifacts    Artifact[]
+  context      MissionContext?
+  milestones   MissionTimeline[]
+  approvals    MissionApproval[]
+  metrics      MissionMetric[]
+  notes        MissionNote[]
+  aiSessions   AiSession[]
+  executions   MissionExecution[]
+  activities   MissionActivity[]
+  dependencies MissionDependency[] @relation("MissionDependent")
+  dependents   MissionDependency[] @relation("MissionDependency")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([projectId])
+  @@index([workspaceId])
   @@index([status])
+  @@index([health])
+  @@index([ownerId])
+  @@index([workspaceId, status])
   @@map("missions")
 }
 
@@ -248,21 +378,24 @@ model Task {
   priority    Priority   @default(MEDIUM)
   position    Int        @default(0) // for ordering within a column
   projectId   String     @map("project_id")
+  missionId   String?    @map("mission_id")
   epicId      String?    @map("epic_id")
   assigneeId  String?    @map("assignee_id")
   // An agent may own/execute a task (AI-assisted execution).
   agentId     String?    @map("agent_id")
 
-  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  epic     Epic?   @relation(fields: [epicId], references: [id], onDelete: SetNull)
-  assignee User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  agent    Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mission   Mission?   @relation(fields: [missionId], references: [id], onDelete: SetNull)
+  epic      Epic?      @relation(fields: [epicId], references: [id], onDelete: SetNull)
+  assignee  User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  agent     Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
   artifacts Artifact[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([projectId])
+  @@index([missionId])
   @@index([epicId])
   @@index([status])
   @@map("tasks")
@@ -285,9 +418,11 @@ model Agent {
   avatarUrl    String?     @map("avatar_url")
   workspaceId  String      @map("workspace_id")
 
-  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tasks     Task[]
-  workflows Workflow[]
+  workspace  Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks      Task[]
+  workflows  Workflow[]
+  aiSessions AiSession[]
+  executions MissionExecution[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -297,17 +432,18 @@ model Agent {
 }
 
 model Workflow {
-  id          String         @id @default(cuid())
-  name        String
-  description String?
-  status      WorkflowStatus @default(DRAFT)
+  id           String         @id @default(cuid())
+  name         String
+  description  String?
+  status       WorkflowStatus @default(DRAFT)
   // Declarative step graph (nodes/edges) stored as JSON.
-  definition  Json           @default("{}")
-  workspaceId String         @map("workspace_id")
-  ownerAgentId String?       @map("owner_agent_id")
+  definition   Json           @default("{}")
+  workspaceId  String         @map("workspace_id")
+  ownerAgentId String?        @map("owner_agent_id")
 
-  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  ownerAgent Agent?    @relation(fields: [ownerAgentId], references: [id], onDelete: SetNull)
+  workspace  Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerAgent Agent?             @relation(fields: [ownerAgentId], references: [id], onDelete: SetNull)
+  executions MissionExecution[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -323,15 +459,18 @@ model Decision {
   outcome   String?
   status    DecisionStatus @default(PROPOSED)
   projectId String         @map("project_id")
+  missionId String?        @map("mission_id")
   authorId  String?        @map("author_id")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  author  User?   @relation("DecisionAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mission Mission? @relation(fields: [missionId], references: [id], onDelete: SetNull)
+  author  User?    @relation("DecisionAuthor", fields: [authorId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([projectId])
+  @@index([missionId])
   @@map("decisions")
 }
 
@@ -343,17 +482,229 @@ model Artifact {
   // Inline content or metadata payload.
   content   Json         @default("{}")
   projectId String       @map("project_id")
+  missionId String?      @map("mission_id")
   taskId    String?      @map("task_id")
+  sessionId String?      @map("session_id")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  task    Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mission Mission?   @relation(fields: [missionId], references: [id], onDelete: SetNull)
+  task    Task?      @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  session AiSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([projectId])
+  @@index([missionId])
   @@index([taskId])
   @@map("artifacts")
+}
+
+// ----------------------------------------------------------------------------
+// Mission Engine — execution entities (all owned by a Mission)
+// ----------------------------------------------------------------------------
+
+/// 1:1 working context for a mission: the brief the engine and agents reason
+/// over. Structured fields are JSON arrays so they can evolve without schema
+/// churn.
+model MissionContext {
+  id          String  @id @default(cuid())
+  missionId   String  @unique @map("mission_id")
+  background  String?
+  constraints Json    @default("[]")
+  assumptions Json    @default("[]")
+  references  Json    @default("[]")
+  metadata    Json    @default("{}")
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("mission_contexts")
+}
+
+/// Planned phases / milestones of a mission (the "Timeline" plan, distinct
+/// from the append-only activity feed).
+model MissionTimeline {
+  id          String         @id @default(cuid())
+  missionId   String         @map("mission_id")
+  title       String
+  description String?
+  status      TimelineStatus @default(PLANNED)
+  position    Int            @default(0)
+  startsAt    DateTime?      @map("starts_at")
+  endsAt      DateTime?      @map("ends_at")
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([missionId])
+  @@map("mission_timelines")
+}
+
+/// Human approval gate. Drives the approval lifecycle and emits activity on
+/// every transition.
+model MissionApproval {
+  id            String         @id @default(cuid())
+  missionId     String         @map("mission_id")
+  title         String
+  description   String?
+  status        ApprovalStatus @default(PENDING)
+  comment       String?
+  // Optional subject the approval is about (e.g. ARTIFACT, DECISION, EXECUTION).
+  subjectType   String?        @map("subject_type")
+  subjectId     String?        @map("subject_id")
+  requestedById String?        @map("requested_by_id")
+  reviewerId    String?        @map("reviewer_id")
+  decidedAt     DateTime?      @map("decided_at")
+
+  mission     Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  requestedBy User?   @relation("ApprovalRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewer    User?   @relation("ApprovalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([missionId])
+  @@index([status])
+  @@map("mission_approvals")
+}
+
+/// Time-series metric sample for a mission (progress, burn, quality, cost…).
+/// Append rows for history; query latest per key for the current value.
+model MissionMetric {
+  id         String   @id @default(cuid())
+  missionId  String   @map("mission_id")
+  key        String // machine key, e.g. "velocity", "cost_burn"
+  label      String
+  value      Float
+  unit       String?
+  target     Float?
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId, key])
+  @@index([missionId, recordedAt])
+  @@map("mission_metrics")
+}
+
+model MissionNote {
+  id        String  @id @default(cuid())
+  missionId String  @map("mission_id")
+  authorId  String? @map("author_id")
+  body      String
+  pinned    Boolean @default(false)
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  author  User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([missionId])
+  @@map("mission_notes")
+}
+
+/// Directed dependency between two missions. `mission` depends on `dependsOn`.
+model MissionDependency {
+  id          String         @id @default(cuid())
+  missionId   String         @map("mission_id")
+  dependsOnId String         @map("depends_on_id")
+  type        DependencyType @default(BLOCKED_BY)
+  note        String?
+
+  mission   Mission @relation("MissionDependent", fields: [missionId], references: [id], onDelete: Cascade)
+  dependsOn Mission @relation("MissionDependency", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([missionId, dependsOnId])
+  @@index([missionId])
+  @@index([dependsOnId])
+  @@map("mission_dependencies")
+}
+
+/// A single AI working session against a mission. Carries token + cost
+/// accounting so the platform can aggregate spend across millions of events.
+model AiSession {
+  id           String          @id @default(cuid())
+  missionId    String          @map("mission_id")
+  agentId      String?         @map("agent_id")
+  title        String
+  status       AiSessionStatus @default(QUEUED)
+  model        String?
+  summary      String?
+  inputTokens  Int             @default(0) @map("input_tokens")
+  outputTokens Int             @default(0) @map("output_tokens")
+  cost         Float           @default(0)
+  startedAt    DateTime?       @map("started_at")
+  completedAt  DateTime?       @map("completed_at")
+
+  mission   Mission    @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  agent     Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  artifacts Artifact[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([missionId])
+  @@index([status])
+  @@map("ai_sessions")
+}
+
+/// An orchestration run of the mission engine — the unit that future BullMQ
+/// workers will pick up. Inputs/outputs are JSON so the contract can evolve.
+model MissionExecution {
+  id         String          @id @default(cuid())
+  missionId  String          @map("mission_id")
+  agentId    String?         @map("agent_id")
+  workflowId String?         @map("workflow_id")
+  status     ExecutionStatus @default(PENDING)
+  trigger    String? // what initiated this run (manual, schedule, dependency…)
+  input      Json            @default("{}")
+  output     Json            @default("{}")
+  error      String?
+  startedAt  DateTime?       @map("started_at")
+  finishedAt DateTime?       @map("finished_at")
+
+  mission  Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  agent    Agent?    @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  workflow Workflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([missionId])
+  @@index([status])
+  @@map("mission_executions")
+}
+
+/// Append-only activity timeline. Designed for high write volume and future
+/// live streaming (every meaningful event becomes one immutable row).
+model MissionActivity {
+  id          String       @id @default(cuid())
+  missionId   String       @map("mission_id")
+  type        ActivityType
+  title       String
+  description String?
+  actorType   ActorType    @default(SYSTEM) @map("actor_type")
+  actorId     String?      @map("actor_id")
+  actorName   String?      @map("actor_name")
+  // Arbitrary structured payload (ids of related entities, diffs, etc.).
+  metadata    Json         @default("{}")
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  actor   User?   @relation("ActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([missionId, createdAt])
+  @@index([type])
+  @@map("mission_activities")
 }
 
 // ----------------------------------------------------------------------------

@@ -23,12 +23,14 @@ group.
 
 ## 📊 Data wiring (replace mock data)
 
-- [ ] Swap each page from `lib/mock-data.ts` to its React Query hook.
-- [ ] Project detail view (board + list) for missions/epics/tasks.
-- [ ] Mission detail view with epic/task breakdown and progress rollup.
-- [ ] Task CRUD + drag-and-drop Kanban (status columns).
-- [ ] Epic, Decision and Artifact API routes + services + repositories.
-- [ ] Optimistic updates + toasts on mutations.
+- [x] Mission detail view (Mission Workspace) on live data + progress rollup.
+- [x] Dashboard rebuilt on live workspace aggregates.
+- [x] Missions list on live data.
+- [ ] Swap Projects + Agents pages from `lib/mock-data.ts` to React Query hooks.
+- [ ] Project detail view (board + list).
+- [ ] Task + Epic CRUD + drag-and-drop Kanban (status columns).
+- [ ] Decision and Artifact create/edit flows (read views shipped).
+- [ ] Optimistic updates + toasts on mutations (currently `router.refresh()`).
 
 ## 🤖 AI agents (no AI in foundation by design)
 

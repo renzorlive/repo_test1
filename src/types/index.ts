@@ -15,9 +15,21 @@ export type {
   Workflow,
   Decision,
   Artifact,
+  // Mission Engine entities
+  MissionContext,
+  MissionTimeline,
+  MissionApproval,
+  MissionMetric,
+  MissionNote,
+  MissionDependency,
+  MissionExecution,
+  MissionActivity,
+  AiSession,
+  // Enums
   Role,
   ProjectStatus,
   MissionStatus,
+  MissionHealth,
   EpicStatus,
   TaskStatus,
   Priority,
@@ -26,6 +38,13 @@ export type {
   WorkflowStatus,
   DecisionStatus,
   ArtifactType,
+  ApprovalStatus,
+  ActivityType,
+  ActorType,
+  AiSessionStatus,
+  ExecutionStatus,
+  DependencyType,
+  TimelineStatus,
 } from "@prisma/client";
 
 /** Generic paginated result wrapper returned by list services. */

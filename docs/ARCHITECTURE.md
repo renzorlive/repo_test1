@@ -37,10 +37,13 @@ independent of HTTP and React.
 ┌──────────────────────────────────────────────────────────┐
 │  UI layer            app/**, components/**, hooks/**        │  React / RSC
 ├──────────────────────────────────────────────────────────┤
-│  API layer           app/api/**  +  server/http.ts         │  HTTP boundary
+│  API layer           app/api/**  (route handlers)          │  HTTP boundary
+│  Controller layer    server/controllers/**                 │  parse + map
+│                      + server/http.ts                      │  HTTP↔service
 ├──────────────────────────────────────────────────────────┤
 │  Service layer       server/services/**                    │  Business rules
-│                      (authorization, orchestration)        │  + access control
+│                      + server/policies/**  (authz)         │  + orchestration
+│                      + server/events/**    (activity)      │  + access control
 ├──────────────────────────────────────────────────────────┤
 │  Repository layer    server/repositories/**                │  Data access only
 ├──────────────────────────────────────────────────────────┤
@@ -49,6 +52,10 @@ independent of HTTP and React.
 
 Cross-cutting: lib/** (env, utils, auth, queue), validations/** (Zod),
                types/**, config/**
+
+Server Components read through the **service layer** directly (the idiomatic
+Next.js path); Client Components fetch the **API layer** via React Query / the
+typed `apiClient`. Both paths converge on services — never on repositories.
 ```
 
 ### Layer responsibilities
@@ -120,6 +127,79 @@ Workspace ──< Membership >── User
 - **Artifact** — an output (document, code, design, dataset…) of a project/task.
 
 See `prisma/schema.prisma` for the full schema, indexes and cascade rules.
+
+---
+
+## 4a. The Mission Engine (central domain)
+
+The **Mission** is the source of truth for execution. Every execution entity
+hangs off a mission, and every meaningful change becomes an immutable activity
+row. This is the platform's core, not CRUD.
+
+### Mission-owned entities
+
+```
+Mission
+├── MissionContext      1:1  working brief (background, constraints, refs)
+├── MissionTimeline     1:N  planned milestones / phases
+├── Epic → Task         1:N  execution breakdown (progress rollup source)
+├── Decision            1:N  decision log
+├── Artifact            1:N  produced outputs
+├── MissionApproval     1:N  human approval gates
+├── MissionMetric       1:N  time-series metric samples
+├── MissionNote         1:N  collaboration notes
+├── MissionDependency   1:N  directed mission→mission edges
+├── AiSession           1:N  AI working sessions (token + cost accounting)
+├── MissionExecution    1:N  orchestration runs (future BullMQ unit)
+└── MissionActivity     1:N  append-only timeline (every important event)
+```
+
+Mission carries the execution envelope directly: `objective`, `outcome`,
+`status`, `health`, `progress`, `owner`, `startedAt`/`completedAt`/`dueDate`,
+`estimatedHours`/`actualHours`, `estimatedCost`/`actualCost`. `workspaceId` is
+**denormalized** from the parent project so workspace dashboards are single
+indexed reads (`@@index([workspaceId, status])`) rather than joins — a
+deliberate choice for scaling to thousands of missions and millions of events.
+
+### Status vs. health
+
+Two orthogonal axes: **status** is the lifecycle (`DRAFT → ACTIVE → COMPLETED`…)
+and **health** is the operational signal (`ON_TRACK`, `AT_RISK`, `OFF_TRACK`,
+`BLOCKED`). `MissionService.deriveHealth()` is a pure function of status,
+progress and deadline; `recompute()` rolls progress up from the task counts.
+
+### Events & the activity timeline
+
+Services never insert activity directly. They call **`missionEvents.emit()`**
+(`server/events/mission-events.ts`), the single chokepoint that:
+
+1. persists a durable `MissionActivity` row, and
+2. fans out to in-process subscribers.
+
+The subscriber seam is where a future SSE/WebSocket bridge or BullMQ publisher
+attaches for **live timelines** — no service code changes required. Every state
+transition (created, status/health changed, completed, approval requested/
+decided, AI session started/completed/failed, note/metric/dependency added)
+flows through it, which is why the timeline is complete by construction.
+
+### Authorization — MissionPolicies
+
+`server/policies/mission.policy.ts` holds pure, role-ranked capability checks
+(`view < contribute/edit < approve/manage`). The shared guard
+`requireMissionAccess(workspaceId, missionId, capability)` combines tenancy,
+cross-tenant ownership verification, and the capability check in one call used
+by every mission-scoped service — so authorization is never re-implemented.
+
+### Request flow (example: decide an approval)
+
+```
+PATCH /api/.../missions/:id/approvals/:approvalId
+  → route handler (thin)               app/api/**
+  → missionController.decideApproval    parse zod, map HTTP
+  → missionApprovalService.decide       requireMissionAccess("approve")
+  → missionApprovalRepository.update     Prisma
+  → missionEvents.emit(APPROVAL_*)       append activity + notify
+```
 
 ---
 

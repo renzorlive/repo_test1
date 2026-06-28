@@ -1,18 +1,12 @@
 /**
- * Mock data for the foundation UI.
+ * Mock data for the foundation pages that are not yet backed by the database.
  *
- * The pages render from these fixtures so the product is fully navigable
- * before the database is seeded or AI integrations exist. Swap these imports
- * for React Query hooks (see `src/hooks/`) once the API is wired to real data.
+ * The Command Center and Missions screens now read live data through the
+ * service layer; Projects and Agents remain mock-driven until their own
+ * service wiring lands (see docs/TODO.md). Replace these imports with the
+ * matching React Query hooks at that point.
  */
-import type {
-  AgentStatus,
-  AgentType,
-  MissionStatus,
-  Priority,
-  ProjectStatus,
-  TaskStatus,
-} from "@/types";
+import type { AgentStatus, AgentType, ProjectStatus } from "@/types";
 
 export interface MockProject {
   id: string;
@@ -26,17 +20,6 @@ export interface MockProject {
   updatedAt: string;
 }
 
-export interface MockMission {
-  id: string;
-  title: string;
-  summary: string;
-  status: MissionStatus;
-  priority: Priority;
-  progress: number;
-  projectKey: string;
-  dueDate: string;
-}
-
 export interface MockAgent {
   id: string;
   name: string;
@@ -44,14 +27,6 @@ export interface MockAgent {
   type: AgentType;
   status: AgentStatus;
   runs: number;
-}
-
-export interface MockTask {
-  id: string;
-  title: string;
-  status: TaskStatus;
-  priority: Priority;
-  projectKey: string;
 }
 
 export const mockProjects: MockProject[] = [
@@ -90,49 +65,6 @@ export const mockProjects: MockProject[] = [
   },
 ];
 
-export const mockMissions: MockMission[] = [
-  {
-    id: "msn_1",
-    title: "Ship authentication & workspaces",
-    summary: "Auth.js, multi-tenant workspaces and RBAC.",
-    status: "ACTIVE",
-    priority: "HIGH",
-    progress: 72,
-    projectKey: "RNZ",
-    dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5).toISOString(),
-  },
-  {
-    id: "msn_2",
-    title: "Command Center v1",
-    summary: "Operational overview surfacing missions and agents.",
-    status: "ACTIVE",
-    priority: "URGENT",
-    progress: 40,
-    projectKey: "RNZ",
-    dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 9).toISOString(),
-  },
-  {
-    id: "msn_3",
-    title: "Q3 acquisition campaign",
-    summary: "Multi-channel launch with attribution tracking.",
-    status: "DRAFT",
-    priority: "MEDIUM",
-    progress: 12,
-    projectKey: "GROW",
-    dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 21).toISOString(),
-  },
-  {
-    id: "msn_4",
-    title: "Acme brand system",
-    summary: "Design tokens, component library and guidelines.",
-    status: "BLOCKED",
-    priority: "HIGH",
-    progress: 30,
-    projectKey: "ACME",
-    dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(),
-  },
-];
-
 export const mockAgents: MockAgent[] = [
   {
     id: "agt_1",
@@ -166,20 +98,4 @@ export const mockAgents: MockAgent[] = [
     status: "PAUSED",
     runs: 41,
   },
-];
-
-export const mockTasks: MockTask[] = [
-  { id: "tsk_1", title: "Implement Prisma schema", status: "DONE", priority: "HIGH", projectKey: "RNZ" },
-  { id: "tsk_2", title: "Build sidebar + top nav", status: "IN_PROGRESS", priority: "HIGH", projectKey: "RNZ" },
-  { id: "tsk_3", title: "Command Center widgets", status: "IN_PROGRESS", priority: "URGENT", projectKey: "RNZ" },
-  { id: "tsk_4", title: "Agent registry UI", status: "TODO", priority: "MEDIUM", projectKey: "RNZ" },
-  { id: "tsk_5", title: "Campaign funnel mockups", status: "IN_REVIEW", priority: "MEDIUM", projectKey: "GROW" },
-  { id: "tsk_6", title: "Acme logo exploration", status: "BLOCKED", priority: "HIGH", projectKey: "ACME" },
-];
-
-export const mockActivity = [
-  { id: "act_1", actor: "Forge", action: "completed task", target: "Implement Prisma schema", at: "2h ago" },
-  { id: "act_2", actor: "Scout", action: "started research on", target: "competitor pricing", at: "3h ago" },
-  { id: "act_3", actor: "Andrei", action: "created mission", target: "Command Center v1", at: "5h ago" },
-  { id: "act_4", actor: "Atlas", action: "decomposed mission", target: "Ship authentication", at: "1d ago" },
 ];
