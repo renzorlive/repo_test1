@@ -1,0 +1,401 @@
+// ============================================================================
+// RNZ OS — Prisma schema
+// An AI Operating System for founders, agencies and AI-assisted development.
+//
+// Design notes:
+//  - Multi-tenant by Workspace. Every domain entity is scoped to a workspace.
+//  - Users join workspaces through Membership (many-to-many + role).
+//  - Execution hierarchy: Project > Mission > Epic > Task.
+//  - Agent / Workflow / Decision / Artifact model the AI-execution layer.
+//  - NextAuth/Auth.js tables (Account, Session, VerificationToken) included.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum MissionStatus {
+  DRAFT
+  ACTIVE
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum EpicStatus {
+  BACKLOG
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  BLOCKED
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum AgentType {
+  ORCHESTRATOR
+  RESEARCHER
+  ENGINEER
+  WRITER
+  ANALYST
+  REVIEWER
+  CUSTOM
+}
+
+enum AgentStatus {
+  IDLE
+  RUNNING
+  PAUSED
+  ERROR
+  DISABLED
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum DecisionStatus {
+  PROPOSED
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ArtifactType {
+  DOCUMENT
+  CODE
+  DESIGN
+  DATASET
+  REPORT
+  LINK
+  OTHER
+}
+
+// ----------------------------------------------------------------------------
+// Identity & tenancy
+// ----------------------------------------------------------------------------
+
+model Workspace {
+  id        String  @id @default(cuid())
+  name      String
+  slug      String  @unique
+  imageUrl  String?
+  // Free-form JSON settings (theme, feature flags, billing tier, etc.).
+  settings  Json    @default("{}")
+
+  memberships Membership[]
+  projects    Project[]
+  agents      Agent[]
+  workflows   Workflow[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@map("workspaces")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  // Hashed password for the credentials provider (nullable for OAuth users).
+  passwordHash  String?   @map("password_hash")
+
+  memberships    Membership[]
+  accounts       Account[]
+  sessions       Session[]
+  assignedTasks  Task[]       @relation("TaskAssignee")
+  authoredDecisions Decision[] @relation("DecisionAuthor")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Membership {
+  id          String @id @default(cuid())
+  role        Role   @default(MEMBER)
+  userId      String @map("user_id")
+  workspaceId String @map("workspace_id")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+  @@map("memberships")
+}
+
+// ----------------------------------------------------------------------------
+// Execution hierarchy: Project > Mission > Epic > Task
+// ----------------------------------------------------------------------------
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  key         String // short uppercase code, e.g. "RNZ", unique per workspace
+  description String?
+  status      ProjectStatus @default(PLANNING)
+  color       String?
+  workspaceId String        @map("workspace_id")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  missions  Mission[]
+  epics     Epic[]
+  tasks     Task[]
+  decisions Decision[]
+  artifacts Artifact[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@map("projects")
+}
+
+model Mission {
+  id          String        @id @default(cuid())
+  title       String
+  summary     String?
+  status      MissionStatus @default(DRAFT)
+  priority    Priority      @default(MEDIUM)
+  progress    Int           @default(0) // 0-100 derived/rollup value
+  dueDate     DateTime?     @map("due_date")
+  projectId   String        @map("project_id")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  epics   Epic[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([status])
+  @@map("missions")
+}
+
+model Epic {
+  id        String     @id @default(cuid())
+  title     String
+  summary   String?
+  status    EpicStatus @default(BACKLOG)
+  projectId String     @map("project_id")
+  missionId String?    @map("mission_id")
+
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mission Mission? @relation(fields: [missionId], references: [id], onDelete: SetNull)
+  tasks   Task[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([missionId])
+  @@map("epics")
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  position    Int        @default(0) // for ordering within a column
+  projectId   String     @map("project_id")
+  epicId      String?    @map("epic_id")
+  assigneeId  String?    @map("assignee_id")
+  // An agent may own/execute a task (AI-assisted execution).
+  agentId     String?    @map("agent_id")
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  epic     Epic?   @relation(fields: [epicId], references: [id], onDelete: SetNull)
+  assignee User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  agent    Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  artifacts Artifact[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([epicId])
+  @@index([status])
+  @@map("tasks")
+}
+
+// ----------------------------------------------------------------------------
+// AI execution layer: Agent > Workflow / Decision / Artifact
+// ----------------------------------------------------------------------------
+
+model Agent {
+  id           String      @id @default(cuid())
+  name         String
+  description  String?
+  type         AgentType   @default(CUSTOM)
+  status       AgentStatus @default(IDLE)
+  // System prompt / role definition (no live AI yet — stored only).
+  instructions String?
+  // Model + tool configuration as JSON (provider-agnostic placeholder).
+  config       Json        @default("{}")
+  avatarUrl    String?     @map("avatar_url")
+  workspaceId  String      @map("workspace_id")
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+  workflows Workflow[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("agents")
+}
+
+model Workflow {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  status      WorkflowStatus @default(DRAFT)
+  // Declarative step graph (nodes/edges) stored as JSON.
+  definition  Json           @default("{}")
+  workspaceId String         @map("workspace_id")
+  ownerAgentId String?       @map("owner_agent_id")
+
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerAgent Agent?    @relation(fields: [ownerAgentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("workflows")
+}
+
+model Decision {
+  id        String         @id @default(cuid())
+  title     String
+  context   String?
+  outcome   String?
+  status    DecisionStatus @default(PROPOSED)
+  projectId String         @map("project_id")
+  authorId  String?        @map("author_id")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User?   @relation("DecisionAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@map("decisions")
+}
+
+model Artifact {
+  id        String       @id @default(cuid())
+  name      String
+  type      ArtifactType @default(DOCUMENT)
+  url       String?
+  // Inline content or metadata payload.
+  content   Json         @default("{}")
+  projectId String       @map("project_id")
+  taskId    String?      @map("task_id")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task    Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([taskId])
+  @@map("artifacts")
+}
+
+// ----------------------------------------------------------------------------
+// NextAuth / Auth.js adapter tables
+// ----------------------------------------------------------------------------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
