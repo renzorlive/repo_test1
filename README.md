@@ -63,7 +63,9 @@ npm run dev                 # http://localhost:3000
 
 **Vision (read first)**
 - [`docs/MANIFESTO.md`](docs/MANIFESTO.md) — why RNZ OS exists; the principles
-- [`docs/MILESTONE_ALPHA_ZERO_CONTEXT.md`](docs/MILESTONE_ALPHA_ZERO_CONTEXT.md) — the north star: one sentence, zero context
+- [`docs/COMPANY_BRAIN.md`](docs/COMPANY_BRAIN.md) — Memory before AI; the Company Brain + Confidence
+- [`docs/MILESTONE_COMPANY_BRAIN_ALPHA.md`](docs/MILESTONE_COMPANY_BRAIN_ALPHA.md) — the north star: knows when it can act vs must ask
+- [`docs/MILESTONE_ALPHA_ZERO_CONTEXT.md`](docs/MILESTONE_ALPHA_ZERO_CONTEXT.md) — the retrieval/intent deep-dive
 - [`docs/EXPERIENCE_SPRINTS.md`](docs/EXPERIENCE_SPRINTS.md) — how we build now (experiences, not features)
 - [`docs/NAMING.md`](docs/NAMING.md) — Mission vs Initiative / Launch / Outcome
 

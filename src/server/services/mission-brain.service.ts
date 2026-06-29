@@ -12,8 +12,16 @@ import { missionPolicy } from "@/server/policies/mission.policy";
 import { missionEvents } from "@/server/events/mission-events";
 import { workerRegistry } from "@/server/ai/worker-registry";
 import { aiExecutionService } from "@/server/services/ai-execution.service";
+import { companyBrain } from "@/server/brain/company-brain";
 import { AppError, ForbiddenError, NotFoundError } from "@/server/errors";
 import type { LaunchMissionInput } from "@/validations";
+
+/** Read a plan's JSON memory blob as a plain object. */
+function readMemory(memory: Prisma.JsonValue): Record<string, unknown> {
+  return memory && typeof memory === "object" && !Array.isArray(memory)
+    ? (memory as Record<string, unknown>)
+    : {};
+}
 
 /** The brain acts as a manager — its actions are attributed to "Mission Brain". */
 const BRAIN = { type: "AGENT" as const, name: "Mission Brain" };
@@ -100,8 +108,22 @@ export const missionBrainService = {
    * The brain takes the next action(s): it processes auto stages until it hits
    * an execution it must wait on, an approval gate, or completion.
    */
-  async advance(workspaceId: string, missionId: string) {
+  async advance(
+    workspaceId: string,
+    missionId: string,
+    opts?: { force?: boolean },
+  ) {
     await requireMissionAccess(workspaceId, missionId, "edit");
+
+    // Founder override: "execute anyway" lifts the confidence gate from here on.
+    if (opts?.force) {
+      const plan = await missionPlanRepository.findByMission(missionId);
+      if (plan) {
+        await missionPlanRepository.updatePlan(plan.id, {
+          memory: { ...readMemory(plan.memory), confidenceOverride: true, confidenceBlocked: false },
+        });
+      }
+    }
 
     for (let i = 0; i < 15; i++) {
       const plan = await missionPlanRepository.findByMission(missionId);
@@ -115,6 +137,13 @@ export const missionBrainService = {
       if (!current) break; // everything done
 
       if (current.status === "WAITING_APPROVAL") break; // waiting on a human
+
+      // Confidence gate: the brain refuses to auto-execute when it doesn't know
+      // enough, and asks for the missing context instead.
+      if (current.type === "EXECUTION" && current.status === "PENDING") {
+        const blocked = await this.confidenceGate(missionId, plan, mission.autonomy);
+        if (blocked) break;
+      }
 
       // Approval gate: pause before running.
       if (current.requiresApproval && current.status === "PENDING") {
@@ -224,6 +253,54 @@ export const missionBrainService = {
   async setMode(workspaceId: string, missionId: string, mode: "FOUNDER" | "ADVANCED") {
     await requireMissionAccess(workspaceId, missionId, "view");
     return missionRepository.update(missionId, { mode });
+  },
+
+  /** The brain's self-assessment: how much it knows before it acts. */
+  async confidence(workspaceId: string, missionId: string) {
+    await requireMissionAccess(workspaceId, missionId, "view");
+    return companyBrain.confidenceForMission(missionId);
+  },
+
+  /**
+   * The heart of "knows when it doesn't know". Returns true (and pauses) when
+   * the brain is not confident enough to execute autonomously, recording what's
+   * missing so the founder can supply it (or override).
+   */
+  async confidenceGate(
+    missionId: string,
+    plan: MissionPlanWithStages,
+    autonomy: string,
+  ): Promise<boolean> {
+    if (autonomy === "MANUAL") return false; // user drives every step
+    const memory = readMemory(plan.memory);
+    if (memory.confidenceOverride) return false; // founder said "go anyway"
+
+    const result = await companyBrain.confidenceForMission(missionId);
+    if (result.canAutoExecute) {
+      if (memory.confidenceBlocked) {
+        await missionPlanRepository.updatePlan(plan.id, {
+          memory: { ...memory, confidenceBlocked: false },
+        });
+      }
+      return false;
+    }
+
+    await missionPlanRepository.updatePlan(plan.id, {
+      memory: {
+        ...memory,
+        confidenceBlocked: true,
+        confidenceScore: result.score,
+        confidenceMissing: result.missing,
+      },
+    });
+    await missionEvents.emit({
+      missionId,
+      type: "MISSION_UPDATED",
+      title: `Mission Brain paused — ${result.score}% confidence. Needs: ${result.missing.join(", ")}`,
+      actor: BRAIN,
+      metadata: { score: result.score, missing: result.missing },
+    });
+    return true;
   },
 
   // ---- Stage execution ------------------------------------------------------

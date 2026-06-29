@@ -1,5 +1,10 @@
 # Milestone Alpha — Zero Context
 
+> **Renamed & expanded → [Company Brain Alpha](./MILESTONE_COMPANY_BRAIN_ALPHA.md).**
+> Zero Context is one half of it ("one sentence, right work"); the other half is
+> Confidence ("knows when it doesn't know"). This doc remains the deep-dive on
+> the retrieval/intent side. See also [`COMPANY_BRAIN.md`](./COMPANY_BRAIN.md).
+
 > The next milestone is not "Sprint 6." It is this.
 
 ## The definition of success

@@ -203,6 +203,34 @@ PATCH /api/.../missions/:id/approvals/:approvalId
 
 ---
 
+## 4a-ter. The Company Brain — Memory before AI
+
+The defining inversion: **Memory comes before the AI.** RNZ OS is the interface;
+**RNZ Memory is the product.**
+
+```
+Everyone else:  User → Prompt → LLM → Result
+RNZ OS:         User → Intent → Memory → Knowledge → Planning → Execution → Result
+```
+
+The **Company Brain** (`server/brain/company-brain.ts`) is the organ with five
+responsibilities — Memory, Retrieval, Planning, Decision Making, Learning. The
+old "Context Builder" is just _one_ of them (Retrieval).
+
+**Confidence** (Decision Making) is shipped: before executing autonomously, the
+brain scores its readiness from explainable signals (`lib/confidence.ts`) and
+**refuses to auto-execute below 85%**, asking for the missing context instead
+(`missionBrainService.confidenceGate`). This is "knowing when it doesn't know" —
+the fix for the deepest flaw in AI agents. The founder can override
+("Execute anyway").
+
+RNZ Memory grows via **Memory Sources** (LOCAL, GitHub, Drive, Notion, Slack…) —
+the same adapter pattern as runtimes/providers. Full design:
+[`COMPANY_BRAIN.md`](./COMPANY_BRAIN.md); milestone:
+[`MILESTONE_COMPANY_BRAIN_ALPHA.md`](./MILESTONE_COMPANY_BRAIN_ALPHA.md).
+
+---
+
 ## 4a-bis. The Autonomous Mission System (the product)
 
 **Outcome-first, not AI-first.** A founder states one objective ("Launch GOCO

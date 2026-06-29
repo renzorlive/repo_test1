@@ -97,8 +97,17 @@ export const missionController = {
     });
   },
 
-  async advanceBrain(workspaceId: string, missionId: string) {
-    return ok(await missionBrainService.advance(workspaceId, missionId));
+  async advanceBrain(req: Request, workspaceId: string, missionId: string) {
+    const body = (await req.json().catch(() => ({}))) as { force?: boolean };
+    return ok(
+      await missionBrainService.advance(workspaceId, missionId, {
+        force: body.force === true,
+      }),
+    );
+  },
+
+  async confidence(workspaceId: string, missionId: string) {
+    return ok(await missionBrainService.confidence(workspaceId, missionId));
   },
 
   async approveStage(workspaceId: string, missionId: string, stageId: string) {

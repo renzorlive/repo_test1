@@ -8,13 +8,19 @@ import {
   PartyPopper,
   Paperclip,
   Loader2,
+  ShieldQuestion,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MissionPipeline } from "./mission-pipeline";
 import { ActivityFeed } from "./activity-feed";
+import { ConfidencePanel } from "./confidence-panel";
 import { useMissionBrain } from "@/hooks/use-mission-brain";
+import {
+  assessConfidence,
+  confidenceInputFromMission,
+} from "@/lib/confidence";
 import type { MissionAggregate } from "@/server/repositories";
 
 interface Props {
@@ -40,6 +46,13 @@ export function MissionCommand({ mission, workspaceId, caps }: Props) {
   const current = stages.find((s) =>
     ["PENDING", "ACTIVE", "WAITING_APPROVAL"].includes(s.status),
   );
+
+  const confidence = assessConfidence(confidenceInputFromMission(mission));
+  const memory = (mission.plan?.memory ?? {}) as {
+    confidenceBlocked?: boolean;
+    confidenceMissing?: string[];
+  };
+  const blocked = Boolean(memory.confidenceBlocked) && !waiting && !complete;
 
   return (
     <div className="space-y-6">
@@ -71,6 +84,33 @@ export function MissionCommand({ mission, workspaceId, caps }: Props) {
                   Request changes
                 </Button>
               </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : blocked ? (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="space-y-3 p-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
+                <ShieldQuestion className="h-4 w-4" />
+                The brain needs more context before executing
+              </p>
+              <span className="text-sm font-semibold">{confidence.score}%</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              It paused on its own rather than guess. Add what&apos;s missing —{" "}
+              {(memory.confidenceMissing ?? confidence.missing).join(", ")} — or
+              run it anyway.
+            </p>
+            {caps.canEdit && (
+              <Button
+                variant="outline"
+                disabled={brain.pending}
+                onClick={() => brain.advance(true)}
+              >
+                {brain.pending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Execute anyway
+              </Button>
             )}
           </CardContent>
         </Card>
@@ -113,6 +153,8 @@ export function MissionCommand({ mission, workspaceId, caps }: Props) {
       )}
 
       {brain.error && <p className="text-sm text-destructive">{brain.error}</p>}
+
+      <ConfidencePanel result={confidence} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Pipeline */}

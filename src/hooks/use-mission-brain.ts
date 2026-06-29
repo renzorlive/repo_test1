@@ -37,7 +37,7 @@ export function useMissionBrain(workspaceId: string, missionId: string) {
   return {
     pending,
     error,
-    advance: () => run("/advance-brain"),
+    advance: (force = false) => run("/advance-brain", "POST", { force }),
     approveStage: (stageId: string) => run(`/stages/${stageId}/approve`),
     rejectStage: (stageId: string) => run(`/stages/${stageId}/reject`),
     setMode: (mode: "FOUNDER" | "ADVANCED") => run("/mode", "PATCH", { mode }),

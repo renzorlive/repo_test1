@@ -15,7 +15,20 @@ group.
 - [ ] SSE live timeline (replace 2.5s polling in `useExecution`).
 - [ ] Persist the chosen goal preset / multi-worker fan-out executions.
 
-## 🧠 Autonomous Mission (shipped — see docs/AUTONOMOUS_MISSION.md)
+## 🧠 Company Brain — Memory before AI (next milestone)
+
+- [x] Confidence: explainable self-score; brain refuses to auto-execute below
+      85% and asks for missing context; founder "Execute anyway". (Decision
+      Making — `lib/confidence`, `companyBrain`, `confidenceGate`, cockpit panel.)
+- [x] Company Brain seam (`server/brain/company-brain.ts`) — 5 responsibilities.
+- [ ] **Intent resolution**: bare sentence → project + action ("Continue GOCO").
+- [ ] **RNZ Memory + Memory Sources**: adapter interface (LOCAL #1, then GitHub,
+      Drive, Notion, Slack…) → knowledge graph; ranked retrieval.
+- [ ] **Confidence v2**: signals from real retrieval evidence; risk-aware
+      threshold (deploy needs more than a draft).
+- See `docs/COMPANY_BRAIN.md` and `docs/MILESTONE_COMPANY_BRAIN_ALPHA.md`.
+
+## 🧩 Autonomous Mission (shipped — see docs/AUTONOMOUS_MISSION.md)
 
 - [x] One objective → the Mission Brain plans, breaks down, assigns workers,
       executes, and pauses only at approval gates.
