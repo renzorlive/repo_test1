@@ -7,6 +7,9 @@
 An execution platform that orchestrates projects, missions, AI agents and knowledge —
 not a task manager, not a chat app.
 
+**Start here → [The RNZ Manifesto](docs/MANIFESTO.md)** · the north star is
+[Milestone Alpha: Zero Context](docs/MILESTONE_ALPHA_ZERO_CONTEXT.md).
+
 </div>
 
 ---
@@ -58,6 +61,13 @@ npm run dev                 # http://localhost:3000
 
 ## 📚 Documentation
 
+**Vision (read first)**
+- [`docs/MANIFESTO.md`](docs/MANIFESTO.md) — why RNZ OS exists; the principles
+- [`docs/MILESTONE_ALPHA_ZERO_CONTEXT.md`](docs/MILESTONE_ALPHA_ZERO_CONTEXT.md) — the north star: one sentence, zero context
+- [`docs/EXPERIENCE_SPRINTS.md`](docs/EXPERIENCE_SPRINTS.md) — how we build now (experiences, not features)
+- [`docs/NAMING.md`](docs/NAMING.md) — Mission vs Initiative / Launch / Outcome
+
+**Technical**
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — layering, multi-tenancy, domain model
 - [`docs/FOLDER_TREE.md`](docs/FOLDER_TREE.md) — annotated folder map
 - [`docs/TODO.md`](docs/TODO.md) — what's not built yet
