@@ -15,29 +15,34 @@ group.
 - [ ] SSE live timeline (replace 2.5s polling in `useExecution`).
 - [ ] Persist the chosen goal preset / multi-worker fan-out executions.
 
-## 🎯 The product: "Continue X" (the One Sentence Test)
+## 🎯 The product: "Resume" (the One Sentence Test) — see docs/RESUME.md
 
-- [x] `/continue` — one sentence → resolve project, recall last decisions /
-      files / activity / state, summarize, propose next steps, score confidence,
-      offer Continue. Works on data RNZ OS holds today.
-- [ ] **Make the real test pass on GOCO**: a Memory Source that indexes the
-      actual repo + decisions (LOCAL/GitHub) feeding `companyBrain` retrieval.
-      This is the whole next sprint — nothing else.
-- [ ] Intent resolution v2 (fuzzy/aliases, action detection beyond "continue").
-- [ ] The 60-second demo video: "Continue GOCO" reconstructs context live.
+- [x] **Resume Engine** — `/resume`, one sentence ("Resume GOCO", "Resume
+      yesterday") → a structured **Resume Package**: objective, what you were
+      doing, what blocks you, decisions, files, the one next action, confidence,
+      estimated time to resume. Works on data RNZ OS holds today.
+- [x] **Resume Snapshots** — auto-checkpoints (`ResumeSnapshot`) at each
+      execution boundary; the next resume loads the last save + diffs.
+- [ ] **Make the real test pass on GOCO** (capability 3): a Memory Source that
+      indexes the actual repo + decisions (LOCAL/GitHub) feeding `companyBrain`
+      retrieval. This is the whole next sprint — nothing else.
+- [ ] Intent resolution v2 (fuzzy/aliases, action detection beyond the project).
+- [ ] The 60-second demo video: "Resume GOCO" reconstructs work state live.
 
 ## 🧠 Company Brain — Memory before AI (next milestone)
 
-- [x] Confidence: explainable self-score; brain refuses to auto-execute below
-      85% and asks for missing context; founder "Execute anyway". (Decision
-      Making — `lib/confidence`, `companyBrain`, `confidenceGate`, cockpit panel.)
+- [x] **Confidence v2** — four explainable dimensions (Knowledge / Planning /
+      Execution / Deployment), each with its own threshold; the brain gates
+      autonomous execution on the Execution dimension and asks for what's
+      missing; founder "Execute anyway". (`lib/confidence`, `companyBrain`,
+      `confidenceGate`, four-ring cockpit panel.)
 - [x] Company Brain seam (`server/brain/company-brain.ts`) — 5 responsibilities.
-- [ ] **Intent resolution**: bare sentence → project + action ("Continue GOCO").
-- [ ] **RNZ Memory + Memory Sources**: adapter interface (LOCAL #1, then GitHub,
-      Drive, Notion, Slack…) → knowledge graph; ranked retrieval.
-- [ ] **Confidence v2**: signals from real retrieval evidence; risk-aware
-      threshold (deploy needs more than a draft).
-- See `docs/COMPANY_BRAIN.md` and `docs/MILESTONE_COMPANY_BRAIN_ALPHA.md`.
+- [x] **Memory Source** adapter seam (`server/memory/source.ts`) — LOCAL #1,
+      vendor-agnostic registry; GitHub/Notion/Slack register without brain edits.
+- [ ] **Intent resolution**: bare sentence → project + action ("Resume GOCO").
+- [ ] **RNZ Memory retrieval**: wire the LOCAL source into the brain, then
+      GitHub → knowledge graph; ranked retrieval feeding Confidence signals.
+- See `docs/RESUME.md`, `docs/COMPANY_BRAIN.md`, `docs/MILESTONE_COMPANY_BRAIN_ALPHA.md`.
 
 ## 🧩 Autonomous Mission (shipped — see docs/AUTONOMOUS_MISSION.md)
 

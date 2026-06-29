@@ -1,4 +1,4 @@
-import { missionRepository } from "@/server/repositories";
+import { missionRepository, aiWorkerRepository } from "@/server/repositories";
 import type { MissionAggregate } from "@/server/repositories";
 import { gatherMissionContextSources } from "@/server/ai/context-sources";
 import { contextBuilder } from "@/server/ai/context-builder";
@@ -37,14 +37,18 @@ export const companyBrain = {
   },
 
   /** Decision making: score readiness to execute from explainable signals. */
-  assess(mission: MissionAggregate): ConfidenceResult {
-    return assessConfidence(confidenceInputFromMission(mission));
+  assess(
+    mission: MissionAggregate,
+    facts?: { hasWorkers?: boolean; hasDeployTarget?: boolean; hasProdCredentials?: boolean },
+  ): ConfidenceResult {
+    return assessConfidence(confidenceInputFromMission(mission, facts));
   },
 
-  /** Load + assess a mission's confidence. */
+  /** Load + assess a mission's confidence, including live runtime facts. */
   async confidenceForMission(missionId: string): Promise<ConfidenceResult> {
     const mission = await missionRepository.findAggregate(missionId);
     if (!mission) throw new NotFoundError("Mission not found");
-    return this.assess(mission);
+    const workers = await aiWorkerRepository.listByWorkspace(mission.workspaceId);
+    return this.assess(mission, { hasWorkers: workers.length > 0 });
   },
 };

@@ -20,6 +20,7 @@ import { useMissionBrain } from "@/hooks/use-mission-brain";
 import {
   assessConfidence,
   confidenceInputFromMission,
+  dimensionOf,
 } from "@/lib/confidence";
 import type { MissionAggregate } from "@/server/repositories";
 
@@ -48,6 +49,7 @@ export function MissionCommand({ mission, workspaceId, caps }: Props) {
   );
 
   const confidence = assessConfidence(confidenceInputFromMission(mission));
+  const execution = dimensionOf(confidence, "EXECUTION");
   const memory = (mission.plan?.memory ?? {}) as {
     confidenceBlocked?: boolean;
     confidenceMissing?: string[];
@@ -95,12 +97,12 @@ export function MissionCommand({ mission, workspaceId, caps }: Props) {
                 <ShieldQuestion className="h-4 w-4" />
                 The brain needs more context before executing
               </p>
-              <span className="text-sm font-semibold">{confidence.score}%</span>
+              <span className="text-sm font-semibold">{execution?.score ?? 0}%</span>
             </div>
             <p className="text-sm text-muted-foreground">
               It paused on its own rather than guess. Add what&apos;s missing —{" "}
-              {(memory.confidenceMissing ?? confidence.missing).join(", ")} — or
-              run it anyway.
+              {(memory.confidenceMissing ?? execution?.missing ?? []).join(", ")} —
+              or run it anyway.
             </p>
             {caps.canEdit && (
               <Button

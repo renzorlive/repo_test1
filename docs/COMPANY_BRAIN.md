@@ -84,37 +84,41 @@ Retrieve Code → Retrieve Artifacts → Generate Plan → Execute
 
 The user supplies a sentence. The brain supplies the context.
 
-## Confidence — knowing when it doesn't know
+## Confidence v2 — knowing when it doesn't know
 
 The single most important behavior: before executing autonomously, the brain
-**scores itself** and explains why.
+**scores itself** and explains why. A single number hid the truth, though — the
+brain can be sure it can _plan_ yet sure it _cannot deploy_. So confidence is
+**four dimensions**, each with its own threshold and signals:
 
 ```
-Confidence 96%
-  ✓ PRD found
-  ✓ Architecture found
-  ✓ Previous conversations found
-  ✓ Codebase indexed
-  ✓ Similar mission found
-  ⚠ Deployment credentials
-  ⚠ Production environment
+Knowledge  92%  ✓ PRD/context  ✓ Decisions  ✓ Codebase indexed  ⚠ Prior runs
+Planning   88%  ✓ Objective    ✓ Plan       ✓ Tasks broken down
+Execution  80%  ✓ Workers      ✓ Tasks      ✓ Codebase
+Deployment  0%  ⚠ Deploy target            ⚠ Production credentials
 ```
 
-Below the threshold (**85%**), the brain does **not** execute on its own. It
-pauses and asks for the missing context — or the founder can override
-("Execute anyway"). This fixes the deepest flaw of AI agents: _they don't know
-when they don't know._
+The autonomous gate keys off **Execution**. Deployment stays near zero until a
+target and credentials exist — exactly the "I can plan this myself, but I can't
+deploy without credentials" case. Below a dimension's threshold the brain does
+**not** act on it: it pauses and asks for what's missing — or the founder
+overrides ("Execute anyway"). This fixes the deepest flaw of AI agents: _they
+don't know when they don't know._ Full spec in [`RESUME.md`](RESUME.md).
 
 Implementation (shipped, heuristic — LLM later):
 
-- `src/lib/confidence.ts` — pure, explainable scorer (signals + weights),
-  shared by the server gate and the client cockpit.
-- `companyBrain.assess()` / `confidence()` — the Decision Making responsibility.
+- `src/lib/confidence.ts` — pure, explainable scorer; four dimensions
+  (Knowledge / Planning / Execution / Deployment) with weighted signals,
+  shared by the server gate and the client cockpit. `dimensionOf()` looks up
+  one dimension's verdict.
+- `companyBrain.assess()` / `confidence()` — the Decision Making responsibility,
+  enriched with live runtime facts (e.g. whether workers are available).
 - `missionBrainService.confidenceGate()` — pauses the autonomous pipeline before
-  the EXECUTION stage when `score < 85` (unless autonomy is MANUAL or the
-  founder overrode it). Records what's missing and narrates it on the timeline.
-- UI: a Confidence panel in the Founder cockpit (score ring + signals), and a
-  "needs more context" gate with **Execute anyway**.
+  the EXECUTION stage when the **Execution** dimension is below threshold
+  (unless autonomy is MANUAL or the founder overrode it). Records what's missing
+  and narrates it on the timeline.
+- UI: a four-ring Confidence panel in the Founder cockpit and the Resume
+  Package, plus a "needs more context" gate with **Execute anyway**.
 
 ## The redefined milestone
 

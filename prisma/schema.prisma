@@ -580,6 +580,7 @@ model Mission {
   aiExecutions AiExecution[]
   plan         MissionPlan?
   stages       MissionStage[]
+  snapshots    ResumeSnapshot[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -591,6 +592,29 @@ model Mission {
   @@index([ownerId])
   @@index([workspaceId, status])
   @@map("missions")
+}
+
+/// A re-entry checkpoint — like a game save. RNZ Memory captures one at each
+/// important moment so resuming loads the last checkpoint instead of rebuilding
+/// the whole history. The `package` JSON is the rendered Resume Package.
+model ResumeSnapshot {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  projectId   String @map("project_id")
+  missionId   String @map("mission_id")
+  summary     String
+  // The full Resume Package at this checkpoint (objective, doing, blocked,
+  // decisions, next action, confidence, estimated time to resume…).
+  data        Json   @default("{}")
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([missionId, createdAt])
+  @@map("resume_snapshots")
 }
 
 /// The autonomous execution plan a Mission Brain owns. One per mission; the

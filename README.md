@@ -65,6 +65,7 @@ npm run dev                 # http://localhost:3000
 **Vision (read first)**
 - [`docs/MANIFESTO.md`](docs/MANIFESTO.md) — why RNZ OS exists; the principles
 - [`docs/THE_ONE_SENTENCE_TEST.md`](docs/THE_ONE_SENTENCE_TEST.md) — the product in one sentence; the test
+- [`docs/RESUME.md`](docs/RESUME.md) — **Resume**: the Resume Package, Snapshots, Confidence v2, the roadmap
 - [`docs/TWO_PRODUCTS.md`](docs/TWO_PRODUCTS.md) — RNZ Memory (engine) + RNZ OS (experience)
 - [`docs/COMPANY_BRAIN.md`](docs/COMPANY_BRAIN.md) — Memory before AI; the Company Brain + Confidence
 - [`docs/MILESTONE_COMPANY_BRAIN_ALPHA.md`](docs/MILESTONE_COMPANY_BRAIN_ALPHA.md) — the north star: knows when it can act vs must ask
@@ -80,7 +81,7 @@ npm run dev                 # http://localhost:3000
 
 ## 🗺️ Routes
 
-`/continue` (**the product: "Continue GOCO"**) · `/login` · `/register` ·
+`/resume` (**the product: "Resume GOCO"**) · `/login` · `/register` ·
 `/command-center` (Mission Control) · `/projects` ·
 `/missions` · `/missions/[id]` (Mission Workspace — Founder/Advanced) ·
 `/missions/[id]/execute` (Execution Wizard) · `/agents` · `/orchestrator`

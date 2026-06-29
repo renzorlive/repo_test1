@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
+  RotateCcw,
   FolderKanban,
   Target,
   Bot,
@@ -24,6 +25,12 @@ export const primaryNav: NavItem[] = [
     href: "/command-center",
     icon: LayoutDashboard,
     description: "Resume missions, run executions and triage approvals.",
+  },
+  {
+    title: "Resume",
+    href: "/resume",
+    icon: RotateCcw,
+    description: "One sentence to re-enter your work state instantly.",
   },
   {
     title: "Projects",

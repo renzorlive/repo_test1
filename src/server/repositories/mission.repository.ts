@@ -133,6 +133,26 @@ export const missionRepository = {
     });
   },
 
+  /** The most recently touched mission in the workspace — "resume yesterday". */
+  findLatestByWorkspace(workspaceId: string) {
+    return prisma.mission.findFirst({
+      where: { workspaceId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, projectId: true },
+    });
+  },
+
+  createSnapshot(data: Prisma.ResumeSnapshotCreateInput) {
+    return prisma.resumeSnapshot.create({ data });
+  },
+
+  latestSnapshot(missionId: string) {
+    return prisma.resumeSnapshot.findFirst({
+      where: { missionId },
+      orderBy: { createdAt: "desc" },
+    });
+  },
+
   create(data: Prisma.MissionCreateInput) {
     return prisma.mission.create({ data, select: listSelect });
   },

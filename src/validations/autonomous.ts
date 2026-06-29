@@ -14,7 +14,7 @@ export const missionAutonomyEnum = z.enum([
 export const launchMissionSchema = z.object({
   objective: z
     .string()
-    .min(4, "Describe what you want to build")
+    .min(4, "Describe what you want to accomplish")
     .max(2000),
   projectId: z.string().cuid().optional(),
   autonomy: missionAutonomyEnum.default("SUPERVISED"),
@@ -24,11 +24,11 @@ export const setMissionModeSchema = z.object({
   mode: missionModeEnum,
 });
 
-/** The product nucleus input: one sentence, e.g. "Continue GOCO". */
-export const continueSchema = z.object({
-  sentence: z.string().min(2, "Say what to continue").max(2000),
+/** The product nucleus input: one sentence, e.g. "Resume GOCO". */
+export const resumeSchema = z.object({
+  sentence: z.string().min(2, "Say what to resume").max(2000),
 });
 
 export type LaunchMissionInput = z.infer<typeof launchMissionSchema>;
 export type SetMissionModeInput = z.infer<typeof setMissionModeSchema>;
-export type ContinueInput = z.infer<typeof continueSchema>;
+export type ResumeInput = z.infer<typeof resumeSchema>;

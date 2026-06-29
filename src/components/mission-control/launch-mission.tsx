@@ -10,9 +10,12 @@ import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/api-client";
 
 const EXAMPLES = [
-  "Launch GOCO Marketplace",
-  "Build the new homepage for GOCO",
-  "Ship a TikTok content engine",
+  "Launch GOCO",
+  "Improve SEO",
+  "Fix bug #421",
+  "Publish a TikTok",
+  "Analyze competitors",
+  "Prepare the investor meeting",
 ];
 
 /**
@@ -49,9 +52,9 @@ export function LaunchMission({ workspaceId }: { workspaceId: string }) {
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="font-semibold leading-tight">Launch a mission</h2>
+            <h2 className="font-semibold leading-tight">Start something</h2>
             <p className="text-xs text-muted-foreground">
-              Describe the outcome. The Mission Brain does the rest.
+              Name the outcome you want. The Mission Brain does the rest.
             </p>
           </div>
         </div>
@@ -66,7 +69,7 @@ export function LaunchMission({ workspaceId }: { workspaceId: string }) {
           <Input
             value={objective}
             onChange={(e) => setObjective(e.target.value)}
-            placeholder="What do you want to build?"
+            placeholder="What do you want to accomplish?"
             className="h-11 flex-1 text-base"
             disabled={pending}
           />
@@ -101,11 +104,11 @@ export function LaunchMission({ workspaceId }: { workspaceId: string }) {
 
         <div className="border-t pt-3">
           <Link
-            href="/continue"
+            href="/resume"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
           >
             <RotateCcw className="h-4 w-4" />
-            …or continue an existing project — “Continue GOCO”
+            …or resume where you left off — “Resume GOCO”
           </Link>
         </div>
       </CardContent>

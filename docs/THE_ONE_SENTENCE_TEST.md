@@ -41,10 +41,12 @@ If it doesn't work, we **fix until it does** — we do not build anything new.
 
 ## Honest status (no overselling)
 
-- ✅ **The experience exists today** at `/continue`. Type a sentence → it
-  resolves the project, recovers the mission's decisions/files/activity/state,
-  summarizes it, proposes next steps, scores confidence, and offers Continue.
-  This already passes the test **on data RNZ OS itself holds.**
+- ✅ **The experience exists today** at `/resume` (the verb generalized from
+  "Continue X" to **Resume** — see [`RESUME.md`](RESUME.md)). Type a sentence →
+  it resolves the project, rebuilds the mission's work state as a structured
+  **Resume Package** (objective, what you were doing, what blocks you, decisions,
+  files, the one next action, four-dimension confidence, time-to-resume), and
+  offers Resume. This already passes the test **on data RNZ OS itself holds.**
 - ⚠️ **The real test on _your_ GOCO** needs RNZ Memory to ingest the real
   sources (the repo, the conversations, the files). The recall is only as good
   as what's indexed. That is the gap — and it's a **Memory Source**, not a UI.

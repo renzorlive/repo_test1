@@ -13,6 +13,8 @@ import { missionEvents } from "@/server/events/mission-events";
 import { workerRegistry } from "@/server/ai/worker-registry";
 import { aiExecutionService } from "@/server/services/ai-execution.service";
 import { companyBrain } from "@/server/brain/company-brain";
+import { resumeService } from "@/server/services/resume.service";
+import { dimensionOf } from "@/lib/confidence";
 import { AppError, ForbiddenError, NotFoundError } from "@/server/errors";
 import type { LaunchMissionInput } from "@/validations";
 
@@ -173,6 +175,10 @@ export const missionBrainService = {
       await this.syncProgress(missionId, plan);
     }
 
+    // Checkpoint: capture a Resume Snapshot at the boundary the brain stopped on,
+    // so the next "Resume …" loads the last save and only fills in the diffs.
+    await resumeService.snapshot(missionId);
+
     return missionPlanRepository.findByMission(missionId);
   },
 
@@ -276,7 +282,8 @@ export const missionBrainService = {
     if (memory.confidenceOverride) return false; // founder said "go anyway"
 
     const result = await companyBrain.confidenceForMission(missionId);
-    if (result.canAutoExecute) {
+    const exec = dimensionOf(result, "EXECUTION");
+    if (!exec || exec.ok) {
       if (memory.confidenceBlocked) {
         await missionPlanRepository.updatePlan(plan.id, {
           memory: { ...memory, confidenceBlocked: false },
@@ -289,16 +296,16 @@ export const missionBrainService = {
       memory: {
         ...memory,
         confidenceBlocked: true,
-        confidenceScore: result.score,
-        confidenceMissing: result.missing,
+        confidenceScore: exec.score,
+        confidenceMissing: exec.missing,
       },
     });
     await missionEvents.emit({
       missionId,
       type: "MISSION_UPDATED",
-      title: `Mission Brain paused — ${result.score}% confidence. Needs: ${result.missing.join(", ")}`,
+      title: `Mission Brain paused — execution confidence ${exec.score}%. Needs: ${exec.missing.join(", ")}`,
       actor: BRAIN,
-      metadata: { score: result.score, missing: result.missing },
+      metadata: { score: exec.score, missing: exec.missing },
     });
     return true;
   },
