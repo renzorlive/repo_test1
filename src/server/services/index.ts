@@ -2,6 +2,8 @@ export { workspaceService } from "./workspace.service";
 export { projectService } from "./project.service";
 export { missionService } from "./mission.service";
 export { missionBrainService } from "./mission-brain.service";
+export { continueService } from "./continue.service";
+export type { ContinueRecall } from "./continue.service";
 export { missionActivityService } from "./mission-activity.service";
 export { missionApprovalService } from "./mission-approval.service";
 export { missionNoteService } from "./mission-note.service";

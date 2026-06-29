@@ -24,5 +24,11 @@ export const setMissionModeSchema = z.object({
   mode: missionModeEnum,
 });
 
+/** The product nucleus input: one sentence, e.g. "Continue GOCO". */
+export const continueSchema = z.object({
+  sentence: z.string().min(2, "Say what to continue").max(2000),
+});
+
 export type LaunchMissionInput = z.infer<typeof launchMissionSchema>;
 export type SetMissionModeInput = z.infer<typeof setMissionModeSchema>;
+export type ContinueInput = z.infer<typeof continueSchema>;

@@ -124,6 +124,15 @@ export const missionRepository = {
     });
   },
 
+  /** The most recently touched mission of a project — "where it left off". */
+  findLatestByProject(projectId: string) {
+    return prisma.mission.findFirst({
+      where: { projectId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true },
+    });
+  },
+
   create(data: Prisma.MissionCreateInput) {
     return prisma.mission.create({ data, select: listSelect });
   },

@@ -15,6 +15,17 @@ group.
 - [ ] SSE live timeline (replace 2.5s polling in `useExecution`).
 - [ ] Persist the chosen goal preset / multi-worker fan-out executions.
 
+## 🎯 The product: "Continue X" (the One Sentence Test)
+
+- [x] `/continue` — one sentence → resolve project, recall last decisions /
+      files / activity / state, summarize, propose next steps, score confidence,
+      offer Continue. Works on data RNZ OS holds today.
+- [ ] **Make the real test pass on GOCO**: a Memory Source that indexes the
+      actual repo + decisions (LOCAL/GitHub) feeding `companyBrain` retrieval.
+      This is the whole next sprint — nothing else.
+- [ ] Intent resolution v2 (fuzzy/aliases, action detection beyond "continue").
+- [ ] The 60-second demo video: "Continue GOCO" reconstructs context live.
+
 ## 🧠 Company Brain — Memory before AI (next milestone)
 
 - [x] Confidence: explainable self-score; brain refuses to auto-execute below

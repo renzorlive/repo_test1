@@ -7,8 +7,9 @@
 An execution platform that orchestrates projects, missions, AI agents and knowledge —
 not a task manager, not a chat app.
 
-**Start here → [The RNZ Manifesto](docs/MANIFESTO.md)** · the north star is
-[Milestone Alpha: Zero Context](docs/MILESTONE_ALPHA_ZERO_CONTEXT.md).
+**Start here → [The RNZ Manifesto](docs/MANIFESTO.md)** · the product in one line:
+**[The One Sentence Test](docs/THE_ONE_SENTENCE_TEST.md)** · the strategy:
+**[Two Products](docs/TWO_PRODUCTS.md)**.
 
 </div>
 
@@ -63,6 +64,8 @@ npm run dev                 # http://localhost:3000
 
 **Vision (read first)**
 - [`docs/MANIFESTO.md`](docs/MANIFESTO.md) — why RNZ OS exists; the principles
+- [`docs/THE_ONE_SENTENCE_TEST.md`](docs/THE_ONE_SENTENCE_TEST.md) — the product in one sentence; the test
+- [`docs/TWO_PRODUCTS.md`](docs/TWO_PRODUCTS.md) — RNZ Memory (engine) + RNZ OS (experience)
 - [`docs/COMPANY_BRAIN.md`](docs/COMPANY_BRAIN.md) — Memory before AI; the Company Brain + Confidence
 - [`docs/MILESTONE_COMPANY_BRAIN_ALPHA.md`](docs/MILESTONE_COMPANY_BRAIN_ALPHA.md) — the north star: knows when it can act vs must ask
 - [`docs/MILESTONE_ALPHA_ZERO_CONTEXT.md`](docs/MILESTONE_ALPHA_ZERO_CONTEXT.md) — the retrieval/intent deep-dive
@@ -77,7 +80,8 @@ npm run dev                 # http://localhost:3000
 
 ## 🗺️ Routes
 
-`/login` · `/register` · `/command-center` (Mission Control) · `/projects` ·
+`/continue` (**the product: "Continue GOCO"**) · `/login` · `/register` ·
+`/command-center` (Mission Control) · `/projects` ·
 `/missions` · `/missions/[id]` (Mission Workspace — Founder/Advanced) ·
 `/missions/[id]/execute` (Execution Wizard) · `/agents` · `/orchestrator`
 (AI Orchestrator) ·

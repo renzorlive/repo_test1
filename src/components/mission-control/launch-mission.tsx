@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Sparkles, ArrowRight, Loader2 } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, RotateCcw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,6 +97,16 @@ export function LaunchMission({ workspaceId }: { workspaceId: string }) {
               {ex}
             </button>
           ))}
+        </div>
+
+        <div className="border-t pt-3">
+          <Link
+            href="/continue"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+          >
+            <RotateCcw className="h-4 w-4" />
+            …or continue an existing project — “Continue GOCO”
+          </Link>
         </div>
       </CardContent>
     </Card>
