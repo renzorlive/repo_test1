@@ -32,12 +32,18 @@ group.
 - [ ] Decision and Artifact create/edit flows (read views shipped).
 - [ ] Optimistic updates + toasts on mutations (currently `router.refresh()`).
 
-## 🤖 AI agents (no AI in foundation by design)
+## 🤖 AI Orchestrator (no live provider calls yet, by design)
 
-- [ ] Agent run history + logs models.
+- [x] Provider-agnostic execution platform: registry, engine, builders, inbox,
+      dashboard (Sprint 3).
+- [x] Execution state machine with per-transition timestamps + event timeline.
+- [x] Provider Adapter Interface + registry (no implementations yet).
+- [ ] Implement provider adapters (OpenAI, Anthropic, …) in `packages/ai-providers`.
+- [ ] Activate BullMQ: drain an `ai-execution` queue; workers call adapters and
+      report via `complete()` / `fail()` (see SPRINT_3.md).
+- [ ] SSE streaming for live execution timelines + token output.
+- [ ] Per-workspace / per-mission cost budgets + alerting.
 - [ ] Workflow builder UI (node/edge editor over `Workflow.definition`).
-- [ ] Activate BullMQ: workers under `server/workers/`, enqueue from services.
-- [ ] Provider-agnostic agent execution interface (deferred — no AI yet).
 
 ## 🎨 UI / UX
 

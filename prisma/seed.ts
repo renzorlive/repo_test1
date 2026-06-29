@@ -223,6 +223,214 @@ async function main() {
     ],
   });
 
+  // ---- AI Orchestrator -----------------------------------------------------
+  const anthropic = await prisma.aiProvider.create({
+    data: { workspaceId: workspace.id, name: "Anthropic", type: "ANTHROPIC" },
+  });
+  const openai = await prisma.aiProvider.create({
+    data: { workspaceId: workspace.id, name: "OpenAI", type: "OPENAI" },
+  });
+
+  const opus = await prisma.aiModel.create({
+    data: {
+      providerId: anthropic.id,
+      name: "claude-opus-4-8",
+      label: "Claude Opus 4.8",
+      contextWindow: 200000,
+      maxOutputTokens: 16000,
+      inputCostPer1k: 0.015,
+      outputCostPer1k: 0.075,
+    },
+  });
+  const gpt4o = await prisma.aiModel.create({
+    data: {
+      providerId: openai.id,
+      name: "gpt-4o",
+      label: "GPT-4o",
+      contextWindow: 128000,
+      maxOutputTokens: 16000,
+      inputCostPer1k: 0.005,
+      outputCostPer1k: 0.015,
+    },
+  });
+
+  const capabilityKinds = [
+    "TEXT_GENERATION",
+    "CODE_GENERATION",
+    "REASONING",
+    "WEB_SEARCH",
+    "SUMMARIZATION",
+  ] as const;
+  const caps: Record<string, { id: string }> = {};
+  for (const kind of capabilityKinds) {
+    caps[kind] = await prisma.aiCapability.create({
+      data: {
+        workspaceId: workspace.id,
+        kind,
+        name: kind
+          .toLowerCase()
+          .split("_")
+          .map((w) => w[0]!.toUpperCase() + w.slice(1))
+          .join(" "),
+      },
+    });
+  }
+
+  const forge = await prisma.aiWorker.create({
+    data: {
+      workspaceId: workspace.id,
+      providerId: anthropic.id,
+      modelId: opus.id,
+      name: "Forge",
+      role: "Engineer",
+      description: "Code generation and review worker.",
+      status: "ACTIVE",
+      health: "HEALTHY",
+      contextWindow: 200000,
+      maxTokens: 16000,
+      inputCostPer1k: 0.015,
+      outputCostPer1k: 0.075,
+      priority: 80,
+      concurrency: 2,
+      lastSeenAt: new Date(),
+      capabilities: { connect: [{ id: caps.CODE_GENERATION!.id }, { id: caps.REASONING!.id }] },
+    },
+  });
+  const scout = await prisma.aiWorker.create({
+    data: {
+      workspaceId: workspace.id,
+      providerId: openai.id,
+      modelId: gpt4o.id,
+      name: "Scout",
+      role: "Researcher",
+      status: "IDLE",
+      health: "HEALTHY",
+      contextWindow: 128000,
+      maxTokens: 16000,
+      inputCostPer1k: 0.005,
+      outputCostPer1k: 0.015,
+      priority: 60,
+      concurrency: 3,
+      lastSeenAt: new Date(),
+      capabilities: { connect: [{ id: caps.TEXT_GENERATION!.id }, { id: caps.WEB_SEARCH!.id }] },
+    },
+  });
+
+  const queue = await prisma.aiQueue.create({
+    data: { workspaceId: workspace.id, name: "default", concurrency: 4, priority: 50 },
+  });
+
+  // A completed execution with full accounting + timeline.
+  await prisma.aiExecution.create({
+    data: {
+      workspaceId: workspace.id,
+      title: "Generate Prisma schema for Mission Engine",
+      state: "COMPLETED",
+      priority: 70,
+      attempt: 1,
+      maxAttempts: 3,
+      confidence: 0.92,
+      input: { userRequest: "Design the Mission Engine schema", requiredCapability: "CODE_GENERATION" },
+      missionId: mission.id,
+      projectId: project.id,
+      workerId: forge.id,
+      queueId: queue.id,
+      requestedById: user.id,
+      runningAt: daysFromNow(-7),
+      completedAt: daysFromNow(-7),
+      prompts: {
+        create: {
+          version: 1,
+          systemInstructions: "You are an AI worker operating inside RNZ OS...",
+          userRequest: "Design the Mission Engine schema",
+          messages: [{ role: "system", content: "..." }],
+          contextPackage: { sections: 4 },
+          tokensEstimated: 4200,
+          hash: "seedhash000000000000000000000001",
+        },
+      },
+      result: { create: { content: "Generated 9 models and 8 enums.", confidence: 0.92, model: "claude-opus-4-8" } },
+      usage: { create: { workspaceId: workspace.id, inputTokens: 4200, outputTokens: 1800, totalTokens: 6000, latencyMs: 8200 } },
+      cost: { create: { workspaceId: workspace.id, inputCost: 0.063, outputCost: 0.135, totalCost: 0.198 } },
+      events: {
+        create: [
+          { type: "QUEUED", message: "Execution queued" },
+          { type: "STARTED", message: "Execution started" },
+          { type: "PROVIDER_SELECTED", message: 'Worker "Forge" selected' },
+          { type: "CONTEXT_READY", message: "Context assembled" },
+          { type: "PROMPT_GENERATED", message: "Prompt v1 generated" },
+          { type: "RUNNING", message: "Execution running" },
+          { type: "COMPLETED", message: "Execution completed" },
+        ],
+      },
+    },
+  });
+
+  // A high-cost completed execution (inbox warning).
+  await prisma.aiExecution.create({
+    data: {
+      workspaceId: workspace.id,
+      title: "Full architecture review",
+      state: "COMPLETED",
+      confidence: 0.41,
+      input: { userRequest: "Review the whole architecture", requiredCapability: "REASONING" },
+      missionId: mission.id,
+      workerId: forge.id,
+      requestedById: user.id,
+      completedAt: new Date(),
+      result: { create: { content: "Architecture review complete.", confidence: 0.41 } },
+      usage: { create: { workspaceId: workspace.id, inputTokens: 60000, outputTokens: 12000, totalTokens: 72000, latencyMs: 31000 } },
+      cost: { create: { workspaceId: workspace.id, inputCost: 0.9, outputCost: 0.9, totalCost: 1.8 } },
+      events: { create: [{ type: "COMPLETED", message: "Execution completed" }] },
+    },
+  });
+
+  // Waiting approval.
+  await prisma.aiExecution.create({
+    data: {
+      workspaceId: workspace.id,
+      title: "Refactor authentication module",
+      state: "WAITING_APPROVAL",
+      requiresApproval: true,
+      input: { userRequest: "Refactor auth", requiredCapability: "CODE_GENERATION" },
+      missionId: mission.id,
+      workerId: forge.id,
+      requestedById: user.id,
+      waitingApprovalAt: new Date(),
+      events: { create: [{ type: "WAITING_APPROVAL", message: "Awaiting human approval" }] },
+    },
+  });
+
+  // Failed with retry budget.
+  await prisma.aiExecution.create({
+    data: {
+      workspaceId: workspace.id,
+      title: "Summarize competitor research",
+      state: "FAILED",
+      attempt: 2,
+      maxAttempts: 3,
+      error: "Provider timeout after 60000ms",
+      input: { userRequest: "Summarize research", requiredCapability: "SUMMARIZATION" },
+      workerId: scout.id,
+      requestedById: user.id,
+      failedAt: new Date(),
+      events: { create: [{ type: "FAILED", message: "Execution failed" }] },
+    },
+  });
+
+  // Queued.
+  await prisma.aiExecution.create({
+    data: {
+      workspaceId: workspace.id,
+      title: "Draft launch announcement",
+      state: "QUEUED",
+      input: { userRequest: "Draft announcement", requiredCapability: "TEXT_GENERATION" },
+      queueId: queue.id,
+      requestedById: user.id,
+      events: { create: [{ type: "QUEUED", message: "Execution queued" }] },
+    },
+  });
+
   console.log("✅ Seed complete. Login: demo@rnz.os / password123");
 }
 

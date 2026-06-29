@@ -190,6 +190,92 @@ enum TimelineStatus {
   SKIPPED
 }
 
+// ---- AI Orchestrator enums --------------------------------------------------
+
+enum AiProviderType {
+  OPENAI
+  ANTHROPIC
+  GOOGLE
+  OLLAMA
+  OPENROUTER
+  LOCAL
+  CUSTOM
+}
+
+/// Lifecycle status of a worker in the registry.
+enum AiWorkerStatus {
+  ACTIVE
+  IDLE
+  BUSY
+  DRAINING
+  DISABLED
+  ERROR
+}
+
+enum AiWorkerHealth {
+  HEALTHY
+  DEGRADED
+  UNHEALTHY
+  UNKNOWN
+}
+
+/// Capability taxonomy a worker/model can advertise and an execution requires.
+enum AiCapabilityKind {
+  TEXT_GENERATION
+  CODE_GENERATION
+  REASONING
+  VISION
+  EMBEDDING
+  FUNCTION_CALLING
+  WEB_SEARCH
+  STRUCTURED_OUTPUT
+  SUMMARIZATION
+  CLASSIFICATION
+}
+
+/// The generic execution state machine. Every transition is timestamped on the
+/// AiExecution row and emitted as an AiExecutionEvent.
+enum AiExecutionState {
+  QUEUED
+  PREPARING
+  BUILDING_CONTEXT
+  RUNNING
+  WAITING_APPROVAL
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRYING
+}
+
+enum AiExecutionEventType {
+  QUEUED
+  STARTED
+  CONTEXT_READY
+  PROMPT_GENERATED
+  PROVIDER_SELECTED
+  RUNNING
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRY_SCHEDULED
+}
+
+enum AiQueueStatus {
+  ACTIVE
+  PAUSED
+  DRAINING
+}
+
+enum AiLogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
 // ----------------------------------------------------------------------------
 // Identity & tenancy
 // ----------------------------------------------------------------------------
@@ -207,6 +293,15 @@ model Workspace {
   missions    Mission[]
   agents      Agent[]
   workflows   Workflow[]
+
+  // AI Orchestrator
+  aiProviders    AiProvider[]
+  aiCapabilities AiCapability[]
+  aiWorkers      AiWorker[]
+  aiQueues       AiQueue[]
+  aiExecutions   AiExecution[]
+  aiCosts        AiCost[]
+  aiUsages       AiUsage[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -236,6 +331,7 @@ model User {
   missionActivities  MissionActivity[] @relation("ActivityActor")
   approvalsRequested MissionApproval[] @relation("ApprovalRequester")
   approvalsReviewed  MissionApproval[] @relation("ApprovalReviewer")
+  aiExecutions       AiExecution[]     @relation("ExecutionRequester")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -273,12 +369,13 @@ model Project {
   color       String?
   workspaceId String        @map("workspace_id")
 
-  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  missions  Mission[]
-  epics     Epic[]
-  tasks     Task[]
-  decisions Decision[]
-  artifacts Artifact[]
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  missions     Mission[]
+  epics        Epic[]
+  tasks        Task[]
+  decisions    Decision[]
+  artifacts    Artifact[]
+  aiExecutions AiExecution[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -337,6 +434,7 @@ model Mission {
   activities   MissionActivity[]
   dependencies MissionDependency[] @relation("MissionDependent")
   dependents   MissionDependency[] @relation("MissionDependency")
+  aiExecutions AiExecution[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -384,12 +482,13 @@ model Task {
   // An agent may own/execute a task (AI-assisted execution).
   agentId     String?    @map("agent_id")
 
-  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  mission   Mission?   @relation(fields: [missionId], references: [id], onDelete: SetNull)
-  epic      Epic?      @relation(fields: [epicId], references: [id], onDelete: SetNull)
-  assignee  User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  agent     Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
-  artifacts Artifact[]
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mission      Mission?      @relation(fields: [missionId], references: [id], onDelete: SetNull)
+  epic         Epic?         @relation(fields: [epicId], references: [id], onDelete: SetNull)
+  assignee     User?         @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  agent        Agent?        @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  artifacts    Artifact[]
+  aiExecutions AiExecution[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -705,6 +804,332 @@ model MissionActivity {
   @@index([missionId, createdAt])
   @@index([type])
   @@map("mission_activities")
+}
+
+// ----------------------------------------------------------------------------
+// AI Orchestrator — provider-agnostic execution platform
+//
+// "Kubernetes for AI workers": providers/models/workers form the registry,
+// executions are first-class entities driven through a generic state machine,
+// and cost/usage are accounted per execution. No provider SDK is referenced
+// here — adapters live behind an interface in the application layer.
+// ----------------------------------------------------------------------------
+
+model AiProvider {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  name        String
+  type        AiProviderType
+  baseUrl     String?        @map("base_url")
+  enabled     Boolean        @default(true)
+  // Non-secret config (region, org id, auth-credential reference — never keys).
+  config      Json           @default("{}")
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  models    AiModel[]
+  workers   AiWorker[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("ai_providers")
+}
+
+model AiModel {
+  id              String  @id @default(cuid())
+  providerId      String  @map("provider_id")
+  name            String // provider model id, e.g. "gpt-4o", "claude-opus-4-8"
+  label           String
+  contextWindow   Int     @default(8192) @map("context_window")
+  maxOutputTokens Int     @default(4096) @map("max_output_tokens")
+  inputCostPer1k  Float   @default(0) @map("input_cost_per_1k")
+  outputCostPer1k Float   @default(0) @map("output_cost_per_1k")
+  enabled         Boolean @default(true)
+
+  provider AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  workers  AiWorker[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([providerId, name])
+  @@index([providerId])
+  @@map("ai_models")
+}
+
+model AiCapability {
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  kind        AiCapabilityKind
+  name        String
+  description String?
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workers   AiWorker[] @relation("WorkerCapabilities")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([workspaceId, kind])
+  @@index([workspaceId])
+  @@map("ai_capabilities")
+}
+
+/// The Worker Registry entry — a configured, schedulable AI worker bound to a
+/// provider + model, with health, pricing, concurrency and tuning.
+model AiWorker {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  providerId  String         @map("provider_id")
+  modelId     String         @map("model_id")
+  name        String
+  role        String // e.g. "Engineer", "Researcher", "Reviewer"
+  description String?
+  status      AiWorkerStatus @default(IDLE)
+  health      AiWorkerHealth @default(UNKNOWN)
+
+  contextWindow   Int    @default(8192) @map("context_window")
+  maxTokens       Int    @default(4096) @map("max_tokens")
+  inputCostPer1k  Float  @default(0) @map("input_cost_per_1k")
+  outputCostPer1k Float  @default(0) @map("output_cost_per_1k")
+  priority        Int    @default(50) // higher wins during scheduling
+  concurrency     Int    @default(1) // max parallel executions
+  temperature     Float  @default(0.7)
+  timeoutMs       Int    @default(60000) @map("timeout_ms")
+  maxRetries      Int    @default(2) @map("max_retries")
+  version         String @default("1")
+
+  lastSeenAt DateTime? @map("last_seen_at")
+
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider     AiProvider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  model        AiModel        @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  capabilities AiCapability[] @relation("WorkerCapabilities")
+  executions   AiExecution[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, status])
+  @@index([workspaceId, health])
+  @@map("ai_workers")
+}
+
+/// A named, prioritized dispatch queue. Executions reference a queue; future
+/// BullMQ workers drain queues respecting `concurrency`.
+model AiQueue {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  name        String
+  description String?
+  status      AiQueueStatus @default(ACTIVE)
+  priority    Int           @default(50)
+  concurrency Int           @default(4)
+
+  workspace  Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  executions AiExecution[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("ai_queues")
+}
+
+/// A first-class AI execution. The unit the orchestrator schedules, drives
+/// through the state machine, and accounts for. Optionally scoped to a
+/// mission, task or project.
+model AiExecution {
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  title       String
+  state       AiExecutionState @default(QUEUED)
+  priority    Int              @default(50)
+  attempt     Int              @default(1)
+  maxAttempts Int              @default(3) @map("max_attempts")
+
+  requiresApproval Boolean @default(false) @map("requires_approval")
+  confidence       Float? // 0..1, populated from the result for low-confidence flags
+  // The original request payload (user request, params, requested capability).
+  input            Json    @default("{}")
+  error            String?
+
+  // Optional scoping
+  missionId     String? @map("mission_id")
+  taskId        String? @map("task_id")
+  projectId     String? @map("project_id")
+  workerId      String? @map("worker_id")
+  queueId       String? @map("queue_id")
+  requestedById String? @map("requested_by_id")
+
+  // Per-transition timestamps (the audit trail of the state machine).
+  queuedAt          DateTime  @default(now()) @map("queued_at")
+  preparingAt       DateTime? @map("preparing_at")
+  contextBuiltAt    DateTime? @map("context_built_at")
+  runningAt         DateTime? @map("running_at")
+  waitingApprovalAt DateTime? @map("waiting_approval_at")
+  completedAt       DateTime? @map("completed_at")
+  failedAt          DateTime? @map("failed_at")
+  cancelledAt       DateTime? @map("cancelled_at")
+  retryingAt        DateTime? @map("retrying_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  mission     Mission?  @relation(fields: [missionId], references: [id], onDelete: SetNull)
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  worker      AiWorker? @relation(fields: [workerId], references: [id], onDelete: SetNull)
+  queue       AiQueue?  @relation(fields: [queueId], references: [id], onDelete: SetNull)
+  requestedBy User?     @relation("ExecutionRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  prompts   AiPrompt[]
+  result    AiResult?
+  cost      AiCost?
+  usage     AiUsage?
+  events    AiExecutionEvent[]
+  logs      AiExecutionLog[]
+  artifacts AiExecutionArtifact[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, state])
+  @@index([workspaceId, createdAt])
+  @@index([missionId])
+  @@index([queueId])
+  @@index([workerId])
+  @@map("ai_executions")
+}
+
+/// A versioned prompt assembled for an execution attempt. The structured
+/// context package is persisted so every run is fully reproducible.
+model AiPrompt {
+  id                 String  @id @default(cuid())
+  executionId        String  @map("execution_id")
+  version            Int     @default(1)
+  systemInstructions String? @map("system_instructions")
+  userRequest        String? @map("user_request")
+  outputFormat       String? @map("output_format")
+  constraints        Json    @default("[]")
+  // Assembled provider-agnostic message list.
+  messages           Json    @default("[]")
+  // The structured context package produced by the Context Builder.
+  contextPackage     Json    @default("{}") @map("context_package")
+  tokensEstimated    Int     @default(0) @map("tokens_estimated")
+  hash               String
+
+  execution AiExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([executionId, version])
+  @@index([executionId])
+  @@map("ai_prompts")
+}
+
+model AiResult {
+  id           String  @id @default(cuid())
+  executionId  String  @unique @map("execution_id")
+  content      String?
+  structured   Json?
+  finishReason String? @map("finish_reason")
+  model        String?
+  confidence   Float?
+  raw          Json    @default("{}")
+
+  execution AiExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ai_results")
+}
+
+/// Monetary cost of an execution. `workspaceId` is denormalized so daily spend
+/// rolls up without joining executions.
+model AiCost {
+  id          String @id @default(cuid())
+  executionId String @unique @map("execution_id")
+  workspaceId String @map("workspace_id")
+  inputCost   Float  @default(0) @map("input_cost")
+  outputCost  Float  @default(0) @map("output_cost")
+  totalCost   Float  @default(0) @map("total_cost")
+  currency    String @default("USD")
+
+  execution AiExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@map("ai_costs")
+}
+
+/// Token + latency usage for an execution (denormalized workspaceId for rollups).
+model AiUsage {
+  id           String @id @default(cuid())
+  executionId  String @unique @map("execution_id")
+  workspaceId  String @map("workspace_id")
+  inputTokens  Int    @default(0) @map("input_tokens")
+  outputTokens Int    @default(0) @map("output_tokens")
+  totalTokens  Int    @default(0) @map("total_tokens")
+  latencyMs    Int?   @map("latency_ms")
+
+  execution AiExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@map("ai_usages")
+}
+
+/// Append-only execution timeline event.
+model AiExecutionEvent {
+  id          String               @id @default(cuid())
+  executionId String               @map("execution_id")
+  type        AiExecutionEventType
+  message     String?
+  data        Json                 @default("{}")
+
+  execution AiExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([executionId, createdAt])
+  @@map("ai_execution_events")
+}
+
+model AiExecutionLog {
+  id          String     @id @default(cuid())
+  executionId String     @map("execution_id")
+  level       AiLogLevel @default(INFO)
+  message     String
+  data        Json       @default("{}")
+
+  execution AiExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([executionId, createdAt])
+  @@map("ai_execution_logs")
+}
+
+model AiExecutionArtifact {
+  id          String       @id @default(cuid())
+  executionId String       @map("execution_id")
+  name        String
+  type        ArtifactType @default(DOCUMENT)
+  url         String?
+  content     Json         @default("{}")
+
+  execution AiExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([executionId])
+  @@map("ai_execution_artifacts")
 }
 
 // ----------------------------------------------------------------------------

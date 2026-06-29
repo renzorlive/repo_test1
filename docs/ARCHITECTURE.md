@@ -203,6 +203,82 @@ PATCH /api/.../missions/:id/approvals/:approvalId
 
 ---
 
+## 4b. The AI Orchestrator ("Kubernetes for AI workers")
+
+The orchestrator coordinates many AI workers running thousands of executions
+per day. It is an execution platform, not a chat: **every AI execution is a
+first-class entity** with a state machine, timeline, cost and result.
+
+### Layering (the critical rule)
+
+```
+Repository → Service → Execution Engine → Provider Adapter Interface → (future providers)
+```
+
+Business logic is **never** coupled to OpenAI/Anthropic/Gemini. The engine
+speaks only the provider-agnostic `AiProviderAdapter` interface
+(`server/ai/providers/types.ts`); concrete adapters register into a registry
+(`providers/registry.ts`) that is **intentionally empty** today. With no
+adapter, the engine drives an execution all the way to `RUNNING` and parks it
+awaiting an external worker callback (`complete()` / `fail()`), so the platform
+runs end-to-end with zero vendor code.
+
+### Registry
+
+`AiProvider → AiModel → AiWorker`, with `AiCapability` (m2m) and `AiQueue`. A
+worker carries everything the scheduler needs: provider+model, status, health,
+context window, max tokens, pricing, priority, concurrency, temperature,
+timeout, retries, version and last-seen. `workerRegistry.select(workspace,
+capability)` picks the best worker — ACTIVE/IDLE, healthy, capable, with a free
+concurrency slot — highest priority first, ties broken by least in-flight load.
+
+### Execution state machine
+
+```
+QUEUED → PREPARING → BUILDING_CONTEXT → RUNNING → (WAITING_APPROVAL) →
+         COMPLETED | FAILED | CANCELLED | RETRYING
+```
+
+Every transition stamps a dedicated timestamp column on `AiExecution` **and**
+appends an `AiExecutionEvent` — the execution timeline is complete by
+construction (Queued, Started, Context Ready, Prompt Generated, Provider
+Selected, Running, Waiting Approval, Approved/Rejected, Completed, Failed,
+Retry Scheduled). Cost (`AiCost`) and token usage (`AiUsage`) are written on
+completion with a denormalized `workspaceId` for daily-spend rollups.
+
+### Context Builder & Prompt Builder (the heart)
+
+- **Context Builder** (`server/ai/context-builder.ts`) — a *pure* transform
+  that assembles a structured `ContextPackage` from workspace, project,
+  mission, recent decisions, artifacts, architecture, relevant files, notes and
+  previous AI sessions. No provider logic; deterministic and testable.
+- **Prompt Builder** (`server/ai/prompt-builder.ts`) — generates a **versioned**
+  prompt (system instructions + context + request + constraints + output
+  format) with a content hash, so every run is reproducible.
+
+The engine persists the full `ContextPackage` and messages on each `AiPrompt`
+version, so an execution can always be replayed exactly as it ran.
+
+### Request flow (example: submit an execution)
+
+```
+POST /api/.../ai/executions
+  → aiController.submitExecution        parse zod
+  → aiExecutionService.submit           requireAiAccess("run") + scoping checks
+  → aiExecutionRepository.create        QUEUED row
+  → executionEngine.advance             select worker → build context →
+                                        build prompt → RUNNING → dispatch
+  → providers/registry (no adapter)     park RUNNING, await worker callback
+```
+
+### AI Inbox
+
+Six triage lanes (`aiInboxService`): waiting approval, failed, completed, retry
+suggestions, high-cost warnings, low-confidence results — each a single indexed
+query, with approve/reject/retry actions.
+
+---
+
 ## 5. Background jobs (prepared, not active)
 
 `lib/queue.ts` sets up a lazy BullMQ connection and a queue registry

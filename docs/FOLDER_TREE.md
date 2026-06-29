@@ -97,11 +97,52 @@ rnz-os/
 │   │   ├── prisma · auth · auth.config · env · queue · api-client · utils
 │   │   ├── active-workspace.ts  # Resolve active workspace (server)
 │   │   └── mock-data.ts         # Projects/Agents fixtures (pending wiring)
-│   ├── validations/             # Zod (mission, mission-engine, …)
+│   ├── validations/             # Zod (mission, mission-engine, ai, …)
 │   ├── types/ · config/
 │   └── middleware.ts            # Edge auth gate
 │
 └── docs/
     ├── ARCHITECTURE.md · FOLDER_TREE.md (this) · TODO.md
-    ├── SPRINT_1.md · SPRINT_2.md
+    ├── SPRINT_1.md · SPRINT_2.md · SPRINT_3.md
+```
+
+## AI Orchestrator additions
+
+```
+src/
+├── server/
+│   ├── ai/                              # Orchestration core (provider-agnostic)
+│   │   ├── execution-engine.ts          # The generic state machine
+│   │   ├── context-builder.ts           # Pure context assembler (the heart)
+│   │   ├── prompt-builder.ts            # Versioned, hashed prompt builder
+│   │   ├── worker-registry.ts           # Capability/priority/concurrency scheduler
+│   │   ├── tokens.ts                    # Token + cost estimation
+│   │   ├── types.ts                     # ContextPackage / PromptPackage
+│   │   └── providers/
+│   │       ├── types.ts                 # AiProviderAdapter interface
+│   │       └── registry.ts              # Adapter registry (empty by design)
+│   ├── controllers/ai.controller.ts     # HTTP↔service mapping
+│   ├── policies/ai.policy.ts            # Role-ranked AI capabilities
+│   ├── services/
+│   │   ├── ai-execution.service.ts      # Authorized facade over the engine
+│   │   ├── ai-worker / ai-provider / ai-queue.service.ts
+│   │   ├── ai-inbox.service.ts          # Six triage lanes
+│   │   ├── ai-dashboard.service.ts      # Orchestrator metrics
+│   │   └── ai-access.ts                 # Tenancy + capability guard
+│   └── repositories/
+│       ├── ai-execution.repository.ts   # Aggregate + child writes
+│       ├── ai-worker / ai-provider / ai-queue.repository.ts
+│       └── ai-dashboard / ai-inbox.repository.ts
+│
+├── app/(dashboard)/
+│   ├── orchestrator/page.tsx                       # Dashboard + worker registry
+│   ├── orchestrator/executions/[executionId]/page.tsx  # Execution detail
+│   └── inbox/page.tsx                              # AI Inbox
+├── app/api/workspaces/[workspaceId]/ai/**          # providers, models, workers,
+│                                                   # queues, executions (+actions),
+│                                                   # inbox, dashboard
+├── components/ai/                                  # worker-registry, inbox-board,
+│                                                   # execution-{state-badge,event-feed,actions}
+├── hooks/use-execution-actions.ts
+└── validations/ai.ts
 ```

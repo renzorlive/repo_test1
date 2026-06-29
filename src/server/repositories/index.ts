@@ -14,3 +14,17 @@ export { missionMetricRepository } from "./mission-metric.repository";
 export { aiSessionRepository } from "./ai-session.repository";
 export { dashboardRepository } from "./dashboard.repository";
 export { agentRepository } from "./agent.repository";
+
+// AI Orchestrator
+export { aiProviderRepository } from "./ai-provider.repository";
+export { aiWorkerRepository } from "./ai-worker.repository";
+export type { AiWorkerWithRefs } from "./ai-worker.repository";
+export { aiQueueRepository } from "./ai-queue.repository";
+export { aiExecutionRepository } from "./ai-execution.repository";
+export type {
+  AiExecutionAggregate,
+  AiExecutionListItem,
+} from "./ai-execution.repository";
+export { aiDashboardRepository } from "./ai-dashboard.repository";
+export { aiInboxRepository, INBOX_THRESHOLDS } from "./ai-inbox.repository";
+export type { InboxExecution } from "./ai-inbox.repository";

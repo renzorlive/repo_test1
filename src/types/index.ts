@@ -25,6 +25,20 @@ export type {
   MissionExecution,
   MissionActivity,
   AiSession,
+  // AI Orchestrator entities
+  AiProvider,
+  AiModel,
+  AiCapability,
+  AiWorker,
+  AiQueue,
+  AiExecution,
+  AiPrompt,
+  AiResult,
+  AiCost,
+  AiUsage,
+  AiExecutionEvent,
+  AiExecutionLog,
+  AiExecutionArtifact,
   // Enums
   Role,
   ProjectStatus,
@@ -45,6 +59,14 @@ export type {
   ExecutionStatus,
   DependencyType,
   TimelineStatus,
+  AiProviderType,
+  AiCapabilityKind,
+  AiWorkerStatus,
+  AiWorkerHealth,
+  AiExecutionState,
+  AiExecutionEventType,
+  AiQueueStatus,
+  AiLogLevel,
 } from "@prisma/client";
 
 /** Generic paginated result wrapper returned by list services. */

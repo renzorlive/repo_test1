@@ -4,6 +4,8 @@ import {
   FolderKanban,
   Target,
   Bot,
+  Cpu,
+  Inbox,
   Settings,
 } from "lucide-react";
 
@@ -39,6 +41,18 @@ export const primaryNav: NavItem[] = [
     href: "/agents",
     icon: Bot,
     description: "Your fleet of specialized AI agents.",
+  },
+  {
+    title: "AI Orchestrator",
+    href: "/orchestrator",
+    icon: Cpu,
+    description: "Workers, queues and execution metrics.",
+  },
+  {
+    title: "AI Inbox",
+    href: "/inbox",
+    icon: Inbox,
+    description: "Approvals, failures and execution triage.",
   },
   {
     title: "Settings",

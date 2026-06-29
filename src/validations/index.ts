@@ -6,3 +6,4 @@ export * from "./mission";
 export * from "./mission-engine";
 export * from "./agent";
 export * from "./task";
+export * from "./ai";
