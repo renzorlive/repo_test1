@@ -19,10 +19,10 @@ export interface NavItem {
 /** Primary sidebar navigation for the dashboard shell. */
 export const primaryNav: NavItem[] = [
   {
-    title: "Command Center",
+    title: "Mission Control",
     href: "/command-center",
     icon: LayoutDashboard,
-    description: "Operational overview of missions, agents and activity.",
+    description: "Resume missions, run executions and triage approvals.",
   },
   {
     title: "Projects",

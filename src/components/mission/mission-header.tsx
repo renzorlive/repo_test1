@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, RefreshCw, ArrowLeft } from "lucide-react";
+import { ChevronDown, RefreshCw, ArrowLeft, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -66,9 +66,9 @@ export function MissionHeader({ mission, workspaceId, canEdit }: Props) {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {mission.owner && (
-            <div className="flex items-center gap-2 rounded-lg border px-3 py-1.5">
+            <div className="hidden items-center gap-2 rounded-lg border px-3 py-1.5 sm:flex">
               <Avatar className="h-6 w-6">
                 <AvatarImage src={mission.owner.image ?? undefined} />
                 <AvatarFallback className="text-[10px]">
@@ -78,6 +78,14 @@ export function MissionHeader({ mission, workspaceId, canEdit }: Props) {
               <span className="text-sm">{mission.owner.name}</span>
             </div>
           )}
+
+          {/* The single primary CTA of the mission page. */}
+          <Button asChild size="lg" className="font-semibold">
+            <Link href={`/missions/${mission.id}/execute`}>
+              <Play className="h-4 w-4 fill-current" />
+              Execute Mission
+            </Link>
+          </Button>
 
           {canEdit && (
             <>

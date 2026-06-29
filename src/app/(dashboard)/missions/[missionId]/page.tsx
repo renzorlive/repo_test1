@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getActiveWorkspace } from "@/lib/active-workspace";
-import { requireMembership, missionService } from "@/server/services";
+import {
+  requireMembership,
+  missionService,
+  executionPlannerService,
+} from "@/server/services";
 import { missionPolicy } from "@/server/policies/mission.policy";
 import { AppError } from "@/server/errors";
 import { MissionWorkspace } from "@/components/mission/mission-workspace";
@@ -25,7 +29,10 @@ export default async function MissionWorkspacePage({
   const { membership } = await requireMembership(workspace.id);
 
   try {
-    const mission = await missionService.getAggregate(workspace.id, missionId);
+    const [mission, suggestions] = await Promise.all([
+      missionService.getAggregate(workspace.id, missionId),
+      executionPlannerService.suggestions(workspace.id, missionId),
+    ]);
     const caps = {
       canEdit: missionPolicy.canEdit(membership.role),
       canApprove: missionPolicy.canApprove(membership.role),
@@ -36,6 +43,7 @@ export default async function MissionWorkspacePage({
         mission={mission}
         workspaceId={workspace.id}
         caps={caps}
+        suggestions={suggestions}
       />
     );
   } catch (error) {

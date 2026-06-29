@@ -156,3 +156,14 @@ export type SubmitExecutionInput = z.infer<typeof submitExecutionSchema>;
 export type CompleteExecutionInput = z.infer<typeof completeExecutionSchema>;
 export type FailExecutionInput = z.infer<typeof failExecutionSchema>;
 export type RejectExecutionInput = z.infer<typeof rejectExecutionSchema>;
+
+/** Preview the assembled context + prompt for the execution wizard (no writes). */
+export const previewExecutionSchema = z.object({
+  goal: z.string().min(1, "Describe the goal").max(20000),
+  requiredCapability: aiCapabilityKindEnum.default("TEXT_GENERATION"),
+  systemInstructions: z.string().max(8000).optional(),
+  outputFormat: z.string().max(2000).optional(),
+  constraints: z.array(z.string().max(500)).max(50).default([]),
+});
+
+export type PreviewExecutionInput = z.infer<typeof previewExecutionSchema>;

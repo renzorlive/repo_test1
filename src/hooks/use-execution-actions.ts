@@ -9,8 +9,12 @@ import { apiClient } from "@/lib/api-client";
  * advance). Thin API calls + `router.refresh()` to re-pull server data. Keyed
  * by execution id so a single hook instance can drive a whole list (the inbox).
  */
-export function useExecutionActions(workspaceId: string) {
+export function useExecutionActions(
+  workspaceId: string,
+  options?: { onAfter?: () => void | Promise<void> },
+) {
   const router = useRouter();
+  const onAfter = options?.onAfter;
   const [pendingId, setPendingId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -23,14 +27,17 @@ export function useExecutionActions(workspaceId: string) {
           `/api/workspaces/${workspaceId}/ai/executions/${executionId}${path}`,
           { method: "POST", body: body ? JSON.stringify(body) : undefined },
         );
-        router.refresh();
+        // Prefer an explicit refetch (e.g. React Query in the wizard); fall back
+        // to refreshing the server components (e.g. the inbox list).
+        if (onAfter) await onAfter();
+        else router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Action failed");
       } finally {
         setPendingId(null);
       }
     },
-    [workspaceId, router],
+    [workspaceId, router, onAfter],
   );
 
   return {
@@ -41,5 +48,19 @@ export function useExecutionActions(workspaceId: string) {
     retry: (id: string) => run(id, "/retry"),
     cancel: (id: string) => run(id, "/cancel"),
     advance: (id: string) => run(id, "/advance"),
+    /**
+     * Report a (simulated) successful worker result. Until provider adapters
+     * exist, this stands in for the external worker callback so the full
+     * execution → completion → summary flow is demonstrable end to end.
+     */
+    simulateComplete: (id: string) =>
+      run(id, "/complete", {
+        content:
+          "Simulated result. Wire a provider adapter to replace this with a real model response.",
+        confidence: 0.86,
+        inputTokens: 3200,
+        outputTokens: 900,
+        latencyMs: 6400,
+      }),
   };
 }

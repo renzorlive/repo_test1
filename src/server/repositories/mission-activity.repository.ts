@@ -28,6 +28,12 @@ export const missionActivityRepository = {
     });
   },
 
+  countSince(workspaceId: string, since: Date) {
+    return prisma.missionActivity.count({
+      where: { mission: { workspaceId }, createdAt: { gte: since } },
+    });
+  },
+
   /** Recent activity across an entire workspace (dashboard feed). */
   listByWorkspace(workspaceId: string, take: number) {
     return prisma.missionActivity.findMany({

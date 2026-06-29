@@ -2,12 +2,11 @@ import type { Prisma } from "@prisma/client";
 import {
   aiExecutionRepository,
   aiWorkerRepository,
-  missionRepository,
-  workspaceRepository,
   type AiWorkerWithRefs,
 } from "@/server/repositories";
 import { workerRegistry } from "@/server/ai/worker-registry";
-import { contextBuilder, type ContextSources } from "@/server/ai/context-builder";
+import { contextBuilder } from "@/server/ai/context-builder";
+import { gatherMissionContextSources } from "@/server/ai/context-sources";
 import { promptBuilder } from "@/server/ai/prompt-builder";
 import { getProviderAdapter } from "@/server/ai/providers/registry";
 import { estimateCost } from "@/server/ai/tokens";
@@ -68,26 +67,6 @@ function stamp(state: AiExecutionState): Prisma.AiExecutionUpdateInput {
     case "RETRYING":
       return { retryingAt: now };
   }
-}
-
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((v): v is string => typeof v === "string")
-    : [];
-}
-
-function asReferences(value: unknown): { label: string; url: string }[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((v) =>
-    v && typeof v === "object" && "url" in v && "label" in v
-      ? [
-          {
-            label: String((v as Record<string, unknown>).label),
-            url: String((v as Record<string, unknown>).url),
-          },
-        ]
-      : [],
-  );
 }
 
 const TERMINAL: AiExecutionState[] = ["COMPLETED", "FAILED", "CANCELLED"];
@@ -155,7 +134,10 @@ export const executionEngine = {
 
     // Context
     exec = await setState(exec.id, "BUILDING_CONTEXT");
-    const sources = await gatherSources(exec);
+    const sources = await gatherMissionContextSources(
+      exec.workspaceId,
+      exec.missionId,
+    );
     const context = contextBuilder.build(sources);
     await emit(exec.id, "CONTEXT_READY", "Context assembled", {
       sections: context.sections.length,
@@ -450,55 +432,4 @@ async function dispatch(
       true,
     );
   }
-}
-
-/** Gather provider-agnostic context sources from repositories. */
-async function gatherSources(exec: AiExecution): Promise<ContextSources> {
-  const workspace = await workspaceRepository.findById(exec.workspaceId);
-  const base: ContextSources = {
-    workspace: {
-      id: exec.workspaceId,
-      name: workspace?.name ?? "Workspace",
-    },
-    architecture:
-      workspace && typeof (workspace.settings as Record<string, unknown>)?.architecture === "string"
-        ? ((workspace.settings as Record<string, unknown>).architecture as string)
-        : null,
-  };
-
-  if (!exec.missionId) return base;
-
-  const mission = await missionRepository.findAggregate(exec.missionId);
-  if (!mission) return base;
-
-  return {
-    ...base,
-    project: mission.project
-      ? { id: mission.project.id, key: mission.project.key, name: mission.project.name }
-      : null,
-    mission: {
-      id: mission.id,
-      title: mission.title,
-      status: mission.status,
-      objective: mission.objective,
-      summary: mission.summary,
-      outcome: mission.outcome,
-      context: mission.context
-        ? {
-            background: mission.context.background,
-            constraints: asStringArray(mission.context.constraints),
-            assumptions: asStringArray(mission.context.assumptions),
-            references: asReferences(mission.context.references),
-          }
-        : null,
-      decisions: mission.decisions.map((d) => ({ title: d.title, outcome: d.outcome })),
-      artifacts: mission.artifacts.map((a) => ({ name: a.name, type: a.type })),
-      notes: mission.notes.map((n) => ({ body: n.body })),
-      aiSessions: mission.aiSessions.map((s) => ({
-        title: s.title,
-        summary: s.summary,
-        status: s.status,
-      })),
-    },
-  };
 }

@@ -146,3 +146,29 @@ src/
 ├── hooks/use-execution-actions.ts
 └── validations/ai.ts
 ```
+
+## Execution Workspace additions (product layer)
+
+```
+src/
+├── app/
+│   ├── (focus)/                                # Full-screen shell (no chrome)
+│   │   ├── layout.tsx
+│   │   └── missions/[missionId]/execute/page.tsx   # Execution Wizard
+│   └── (dashboard)/command-center/page.tsx     # Rebuilt as Mission Control
+├── components/
+│   ├── execution/
+│   │   ├── execution-wizard.tsx                 # 8-step full-screen flow
+│   │   ├── execution-live-view.tsx             # Live progress + auto summary
+│   │   └── wizard-stepper.tsx                   # Mobile-friendly stepper
+│   ├── mission-control/mission-card.tsx        # Large mission card + Execute CTA
+│   ├── mission/mission-milestones.tsx          # Milestone ladder (not %)
+│   ├── mission/mission-suggestions.tsx         # Proactive AI suggestions
+│   └── layout/mobile-nav.tsx                    # Bottom tab bar (mobile)
+├── server/
+│   ├── ai/context-sources.ts                   # Shared context gatherer
+│   └── services/
+│       ├── execution-planner.service.ts        # Preview + suggestions
+│       └── mission-control.service.ts          # Homepage aggregate
+└── hooks/use-execution.ts                       # Live execution polling
+```

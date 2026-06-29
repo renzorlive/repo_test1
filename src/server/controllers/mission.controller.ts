@@ -7,6 +7,7 @@ import {
   missionDependencyService,
   missionMetricService,
   aiSessionService,
+  executionPlannerService,
 } from "@/server/services";
 import {
   createMissionSchema,
@@ -21,6 +22,7 @@ import {
   updateContextSchema,
   createMilestoneSchema,
   activityQuerySchema,
+  previewExecutionSchema,
 } from "@/validations";
 import { listQuerySchema } from "@/validations/common";
 
@@ -72,6 +74,15 @@ export const missionController = {
     return ok(await missionService.addMilestone(workspaceId, missionId, input), {
       status: 201,
     });
+  },
+
+  // ---- Execution wizard -----------------------------------------------------
+
+  async previewExecution(req: Request, workspaceId: string, missionId: string) {
+    const input = previewExecutionSchema.parse(await req.json());
+    return ok(
+      await executionPlannerService.preview(workspaceId, missionId, input),
+    );
   },
 
   // ---- Activity -------------------------------------------------------------

@@ -4,6 +4,17 @@ The foundation is intentionally scoped. This is the backlog of what is **not**
 yet built, grouped by area. Items are roughly ordered by priority within each
 group.
 
+## 🚀 Execution Workspace (shipped — see docs/EXECUTION_WORKSPACE.md)
+
+- [x] Mission Control homepage (large cards, running, approvals, weekly goals).
+- [x] Single primary CTA "▶ Execute Mission" + full-screen 8-step wizard.
+- [x] Context/prompt preview, live progress view, auto execution summary.
+- [x] Milestone-based progress + proactive AI suggestions.
+- [x] Mobile bottom nav; mobile-first wizard.
+- [ ] Replace the "Simulate worker result" action once provider adapters exist.
+- [ ] SSE live timeline (replace 2.5s polling in `useExecution`).
+- [ ] Persist the chosen goal preset / multi-worker fan-out executions.
+
 ## 🔐 Auth & access control
 
 - [ ] OAuth providers (GitHub, Google) alongside credentials.

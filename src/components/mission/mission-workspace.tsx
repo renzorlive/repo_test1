@@ -31,7 +31,10 @@ import { ActivityFeed } from "./activity-feed";
 import { ApprovalsPanel } from "./approvals-panel";
 import { NotesPanel } from "./notes-panel";
 import { AiSessionsPanel } from "./ai-sessions-panel";
+import { MissionMilestones } from "./mission-milestones";
+import { MissionSuggestionsPanel } from "./mission-suggestions";
 import type { MissionAggregate } from "@/server/repositories";
+import type { MissionSuggestions } from "@/server/services";
 
 export type MissionAggregateView = MissionAggregate;
 
@@ -45,6 +48,7 @@ interface Props {
   mission: MissionAggregateView;
   workspaceId: string;
   caps: MissionCapabilities;
+  suggestions: MissionSuggestions;
 }
 
 const TABS = [
@@ -86,7 +90,12 @@ function asReferences(value: unknown): { label: string; url: string }[] {
   );
 }
 
-export function MissionWorkspace({ mission, workspaceId, caps }: Props) {
+export function MissionWorkspace({
+  mission,
+  workspaceId,
+  caps,
+  suggestions,
+}: Props) {
   const { tasks } = mission;
   const tasksByStatus = React.useMemo(() => {
     const groups: Record<string, typeof tasks> = {};
@@ -166,6 +175,9 @@ export function MissionWorkspace({ mission, workspaceId, caps }: Props) {
               </Card>
             </div>
           </FadeIn>
+          <FadeIn delay={0.08} className="mt-4">
+            <MissionSuggestionsPanel suggestions={suggestions} />
+          </FadeIn>
         </TabsContent>
 
         {/* Objectives */}
@@ -181,12 +193,18 @@ export function MissionWorkspace({ mission, workspaceId, caps }: Props) {
           <FadeIn>
             <div className="grid gap-4 md:grid-cols-3">
               <Card className="md:col-span-3">
-                <CardContent className="space-y-3 p-6">
-                  <SectionTitle icon={TrendingUp}>Completion</SectionTitle>
-                  <div className="flex items-center gap-3">
-                    <Progress value={mission.progress} />
-                    <span className="text-sm font-medium">{mission.progress}%</span>
+                <CardContent className="space-y-4 p-6">
+                  <div className="flex items-center justify-between">
+                    <SectionTitle icon={TrendingUp}>Milestones</SectionTitle>
+                    <span className="text-sm text-muted-foreground">
+                      {mission.progress}% complete
+                    </span>
                   </div>
+                  <MissionMilestones
+                    status={mission.status}
+                    progress={mission.progress}
+                    activities={mission.activities}
+                  />
                 </CardContent>
               </Card>
               <EnvelopeCard icon={Clock} label="Hours" actual={mission.actualHours} estimate={mission.estimatedHours} unit="h" />

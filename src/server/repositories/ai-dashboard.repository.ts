@@ -84,4 +84,40 @@ export const aiDashboardRepository = {
       include: { execution: { select: { id: true, title: true } } },
     });
   },
+
+  /** In-flight executions for the Mission Control "running" widget. */
+  runningExecutions(workspaceId: string, take: number) {
+    return prisma.aiExecution.findMany({
+      where: {
+        workspaceId,
+        state: {
+          in: [
+            "QUEUED",
+            "PREPARING",
+            "BUILDING_CONTEXT",
+            "RUNNING",
+            "WAITING_APPROVAL",
+            "RETRYING",
+          ],
+        },
+      },
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+      take,
+      select: {
+        id: true,
+        title: true,
+        state: true,
+        createdAt: true,
+        worker: { select: { id: true, name: true, role: true } },
+        mission: { select: { id: true, title: true } },
+        cost: { select: { totalCost: true } },
+      },
+    });
+  },
+
+  countCompletedSince(workspaceId: string, since: Date) {
+    return prisma.aiExecution.count({
+      where: { workspaceId, state: "COMPLETED", completedAt: { gte: since } },
+    });
+  },
 };
