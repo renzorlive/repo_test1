@@ -4,6 +4,7 @@ export * from "./workspace";
 export * from "./project";
 export * from "./mission";
 export * from "./mission-engine";
+export * from "./autonomous";
 export * from "./agent";
 export * from "./task";
 export * from "./ai";

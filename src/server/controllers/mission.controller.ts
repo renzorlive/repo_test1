@@ -1,6 +1,7 @@
 import { ok } from "@/server/http";
 import {
   missionService,
+  missionBrainService,
   missionActivityService,
   missionApprovalService,
   missionNoteService,
@@ -23,6 +24,8 @@ import {
   createMilestoneSchema,
   activityQuerySchema,
   previewExecutionSchema,
+  launchMissionSchema,
+  setMissionModeSchema,
 } from "@/validations";
 import { listQuerySchema } from "@/validations/common";
 
@@ -83,6 +86,36 @@ export const missionController = {
     return ok(
       await executionPlannerService.preview(workspaceId, missionId, input),
     );
+  },
+
+  // ---- Autonomous Mission (the brain) ---------------------------------------
+
+  async launchMission(req: Request, workspaceId: string) {
+    const input = launchMissionSchema.parse(await req.json());
+    return ok(await missionBrainService.launch(workspaceId, input), {
+      status: 201,
+    });
+  },
+
+  async advanceBrain(workspaceId: string, missionId: string) {
+    return ok(await missionBrainService.advance(workspaceId, missionId));
+  },
+
+  async approveStage(workspaceId: string, missionId: string, stageId: string) {
+    return ok(
+      await missionBrainService.approveStage(workspaceId, missionId, stageId),
+    );
+  },
+
+  async rejectStage(workspaceId: string, missionId: string, stageId: string) {
+    return ok(
+      await missionBrainService.rejectStage(workspaceId, missionId, stageId),
+    );
+  },
+
+  async setMode(req: Request, workspaceId: string, missionId: string) {
+    const { mode } = setMissionModeSchema.parse(await req.json());
+    return ok(await missionBrainService.setMode(workspaceId, missionId, mode));
   },
 
   // ---- Activity -------------------------------------------------------------

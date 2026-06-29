@@ -205,3 +205,21 @@ src/
 │                                                # connect-machine, run-on-machine, badges
 └── hooks/use-runtime-execution.ts · use-runtime-actions.ts
 ```
+
+## Autonomous Mission additions (the product layer)
+
+```
+src/
+├── server/
+│   ├── services/mission-brain.service.ts        # The autonomous manager
+│   └── repositories/mission-plan.repository.ts  # Plan + pipeline stages
+├── app/api/workspaces/[workspaceId]/missions/
+│   ├── launch/route.ts                          # One objective → planned mission
+│   └── [missionId]/{advance-brain,mode}/route.ts
+│   └── [missionId]/stages/[stageId]/{approve,reject}/route.ts
+├── components/
+│   ├── mission-control/launch-mission.tsx       # The single-objective hero
+│   └── mission/{mission-command,mission-pipeline,mode-toggle}.tsx
+├── hooks/use-mission-brain.ts
+└── validations/autonomous.ts
+```

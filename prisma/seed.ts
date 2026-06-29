@@ -223,6 +223,33 @@ async function main() {
     ],
   });
 
+  // ---- Autonomous plan (Mission Brain) -------------------------------------
+  // The mission is mid-flight and paused at the Review gate, so Founder Mode
+  // shows the "Approve & continue" cockpit out of the box.
+  await prisma.missionPlan.create({
+    data: {
+      missionId: mission.id,
+      objective: mission.objective ?? mission.title,
+      status: "ACTIVE",
+      currentStage: "REVIEW",
+      stages: {
+        create: [
+          { missionId: mission.id, type: "PLANNING", title: "Plan the work", position: 0, status: "COMPLETED", completedAt: daysFromNow(-9) },
+          { missionId: mission.id, type: "ARCHITECTURE", title: "Design the architecture", position: 1, status: "COMPLETED", completedAt: daysFromNow(-8) },
+          { missionId: mission.id, type: "TASK_BREAKDOWN", title: "Break the goal into tasks", position: 2, status: "COMPLETED", completedAt: daysFromNow(-8) },
+          { missionId: mission.id, type: "WORKER_ASSIGNMENT", title: "Assign AI workers", position: 3, status: "COMPLETED", completedAt: daysFromNow(-7) },
+          { missionId: mission.id, type: "EXECUTION", title: "Execute the work", position: 4, status: "COMPLETED", completedAt: daysFromNow(-6) },
+          { missionId: mission.id, type: "REVIEW", title: "Review the result", position: 5, status: "WAITING_APPROVAL", requiresApproval: true, startedAt: daysFromNow(-1) },
+          { missionId: mission.id, type: "FIX", title: "Apply fixes", position: 6, status: "PENDING" },
+          { missionId: mission.id, type: "COMMIT", title: "Commit the changes", position: 7, status: "PENDING" },
+          { missionId: mission.id, type: "DEPLOY", title: "Deploy", position: 8, status: "PENDING", requiresApproval: true },
+          { missionId: mission.id, type: "RELEASE_NOTES", title: "Generate release notes", position: 9, status: "PENDING" },
+          { missionId: mission.id, type: "DONE", title: "Done", position: 10, status: "PENDING" },
+        ],
+      },
+    },
+  });
+
   // ---- AI Orchestrator -----------------------------------------------------
   const anthropic = await prisma.aiProvider.create({
     data: { workspaceId: workspace.id, name: "Anthropic", type: "ANTHROPIC" },

@@ -67,6 +67,7 @@ const aggregateInclude = {
     take: 50,
     include: { actor: { select: { id: true, name: true, image: true } } },
   },
+  plan: { include: { stages: { orderBy: { position: "asc" } } } },
 } satisfies Prisma.MissionInclude;
 
 export type MissionAggregate = Prisma.MissionGetPayload<{
@@ -165,6 +166,18 @@ export const missionRepository = {
 
   createArtifact(data: Prisma.ArtifactCreateInput) {
     return prisma.artifact.create({ data });
+  },
+
+  createDecision(data: Prisma.DecisionCreateInput) {
+    return prisma.decision.create({ data });
+  },
+
+  createEpic(data: Prisma.EpicCreateInput) {
+    return prisma.epic.create({ data });
+  },
+
+  createTasks(data: Prisma.TaskCreateManyInput[]) {
+    return prisma.task.createMany({ data });
   },
 
   nextMilestonePosition(missionId: string) {

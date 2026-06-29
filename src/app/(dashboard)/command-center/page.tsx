@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/page-header";
 import { FadeIn } from "@/components/motion/fade-in";
 import { EmptyState } from "@/components/empty-state";
 import { MissionControlCard } from "@/components/mission-control/mission-card";
+import { LaunchMission } from "@/components/mission-control/launch-mission";
 import { ExecutionStateBadge } from "@/components/ai/execution-state-badge";
 import {
   Card,
@@ -54,11 +55,16 @@ export default async function MissionControlPage() {
     <div className="space-y-8">
       <PageHeader
         title="Mission Control"
-        description="Resume a mission, launch an execution, and clear what needs you."
+        description="State an outcome. Approve the result. The brain does the rest."
       />
 
-      {/* Today's progress */}
+      {/* Launch a mission from a single objective */}
       <FadeIn>
+        <LaunchMission workspaceId={workspace.id} />
+      </FadeIn>
+
+      {/* Today's progress */}
+      <FadeIn delay={0.03}>
         <div className="grid grid-cols-3 gap-3">
           <ProgressChip
             icon={Activity}

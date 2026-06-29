@@ -66,8 +66,9 @@ npm run dev                 # http://localhost:3000
 ## 🗺️ Routes
 
 `/login` · `/register` · `/command-center` (Mission Control) · `/projects` ·
-`/missions` · `/missions/[id]` (Mission Workspace) · `/missions/[id]/execute`
-(Execution Wizard) · `/agents` · `/orchestrator` (AI Orchestrator) ·
+`/missions` · `/missions/[id]` (Mission Workspace — Founder/Advanced) ·
+`/missions/[id]/execute` (Execution Wizard) · `/agents` · `/orchestrator`
+(AI Orchestrator) ·
 `/orchestrator/executions/[id]` · `/inbox` (AI Inbox) · `/machines` (Host
 Dashboard) · `/machines/executions/[id]` (Live Terminal) · `/settings`
 

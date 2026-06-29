@@ -33,6 +33,8 @@ import { NotesPanel } from "./notes-panel";
 import { AiSessionsPanel } from "./ai-sessions-panel";
 import { MissionMilestones } from "./mission-milestones";
 import { MissionSuggestionsPanel } from "./mission-suggestions";
+import { MissionCommand } from "./mission-command";
+import { ModeToggle } from "./mode-toggle";
 import type { MissionAggregate } from "@/server/repositories";
 import type { MissionSuggestions } from "@/server/services";
 
@@ -105,6 +107,10 @@ export function MissionWorkspace({
     return groups;
   }, [tasks]);
 
+  // Founder Mode hides every tab behind the autonomous cockpit; Advanced Mode
+  // (or a mission with no plan) shows the full execution surface.
+  const founderView = mission.mode === "FOUNDER" && Boolean(mission.plan);
+
   return (
     <div className="space-y-6">
       <MissionHeader
@@ -113,7 +119,24 @@ export function MissionWorkspace({
         canEdit={caps.canEdit}
       />
 
-      <Tabs defaultValue="overview">
+      {mission.plan && (
+        <div className="flex justify-end">
+          <ModeToggle
+            workspaceId={workspaceId}
+            missionId={mission.id}
+            mode={mission.mode}
+          />
+        </div>
+      )}
+
+      {founderView ? (
+        <MissionCommand
+          mission={mission}
+          workspaceId={workspaceId}
+          caps={{ canApprove: caps.canApprove, canEdit: caps.canEdit }}
+        />
+      ) : (
+        <Tabs defaultValue="overview">
         <div className="-mx-1 overflow-x-auto scrollbar-thin">
           <TabsList className="h-auto flex-nowrap justify-start">
             {TABS.map((tab) => {
@@ -462,7 +485,8 @@ export function MissionWorkspace({
             <ActivityFeed items={mission.activities} />
           </SectionCard>
         </TabsContent>
-      </Tabs>
+        </Tabs>
+      )}
     </div>
   );
 }

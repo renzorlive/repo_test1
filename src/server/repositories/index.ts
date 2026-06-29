@@ -7,6 +7,8 @@ export type {
 } from "./mission.repository";
 export { missionActivityRepository } from "./mission-activity.repository";
 export type { ActivityWithActor } from "./mission-activity.repository";
+export { missionPlanRepository } from "./mission-plan.repository";
+export type { MissionPlanWithStages } from "./mission-plan.repository";
 export { missionApprovalRepository } from "./mission-approval.repository";
 export { missionNoteRepository } from "./mission-note.repository";
 export { missionDependencyRepository } from "./mission-dependency.repository";

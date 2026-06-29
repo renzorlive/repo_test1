@@ -190,6 +190,54 @@ enum TimelineStatus {
   SKIPPED
 }
 
+// ---- Autonomous Mission enums -----------------------------------------------
+
+/// How much complexity the UI shows. Founder hides everything; Advanced exposes
+/// every execution detail.
+enum MissionMode {
+  FOUNDER
+  ADVANCED
+}
+
+/// How much the Mission Brain does without asking.
+enum MissionAutonomy {
+  MANUAL // user drives every step
+  SUPERVISED // brain runs, pauses at approval gates
+  AUTONOMOUS // brain runs end to end (still records approvals)
+}
+
+enum MissionPlanStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+/// The autonomous pipeline a Mission Brain drives a goal through.
+enum MissionStageType {
+  PLANNING
+  ARCHITECTURE
+  TASK_BREAKDOWN
+  WORKER_ASSIGNMENT
+  EXECUTION
+  REVIEW
+  FIX
+  COMMIT
+  DEPLOY
+  RELEASE_NOTES
+  DONE
+}
+
+enum MissionStageStatus {
+  PENDING
+  ACTIVE
+  WAITING_APPROVAL
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
 // ---- AI Orchestrator enums --------------------------------------------------
 
 enum AiProviderType {
@@ -493,6 +541,10 @@ model Mission {
   priority Priority      @default(MEDIUM)
   progress Int           @default(0) // 0-100 rollup derived from tasks
 
+  // Autonomous Mission: the brain's operating mode + autonomy level.
+  mode     MissionMode     @default(FOUNDER)
+  autonomy MissionAutonomy @default(SUPERVISED)
+
   // Time & cost envelope — the basis for execution analytics.
   startedAt      DateTime? @map("started_at")
   completedAt    DateTime? @map("completed_at")
@@ -526,6 +578,8 @@ model Mission {
   dependencies MissionDependency[] @relation("MissionDependent")
   dependents   MissionDependency[] @relation("MissionDependency")
   aiExecutions AiExecution[]
+  plan         MissionPlan?
+  stages       MissionStage[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -537,6 +591,55 @@ model Mission {
   @@index([ownerId])
   @@index([workspaceId, status])
   @@map("missions")
+}
+
+/// The autonomous execution plan a Mission Brain owns. One per mission; the
+/// brain drives `stages` from a single business objective to "Done".
+model MissionPlan {
+  id           String            @id @default(cuid())
+  missionId    String            @unique @map("mission_id")
+  objective    String
+  status       MissionPlanStatus @default(DRAFT)
+  currentStage MissionStageType? @map("current_stage")
+  summary      String?
+  // The brain's working memory (rolling notes the manager keeps).
+  memory       Json              @default("{}")
+
+  mission Mission        @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  stages  MissionStage[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("mission_plans")
+}
+
+/// One step in the autonomous pipeline. The brain advances stages, pausing at
+/// the ones that require human approval.
+model MissionStage {
+  id               String             @id @default(cuid())
+  planId           String             @map("plan_id")
+  missionId        String             @map("mission_id")
+  type             MissionStageType
+  title            String
+  description      String?
+  status           MissionStageStatus @default(PENDING)
+  position         Int                @default(0)
+  requiresApproval Boolean            @default(false) @map("requires_approval")
+  // What the stage produced (summary, created ids, execution id, etc.).
+  output           Json               @default("{}")
+  startedAt        DateTime?          @map("started_at")
+  completedAt      DateTime?          @map("completed_at")
+
+  plan    MissionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  mission Mission     @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([planId, position])
+  @@index([missionId])
+  @@map("mission_stages")
 }
 
 model Epic {

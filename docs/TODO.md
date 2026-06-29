@@ -15,6 +15,18 @@ group.
 - [ ] SSE live timeline (replace 2.5s polling in `useExecution`).
 - [ ] Persist the chosen goal preset / multi-worker fan-out executions.
 
+## 🧠 Autonomous Mission (shipped — see docs/AUTONOMOUS_MISSION.md)
+
+- [x] One objective → the Mission Brain plans, breaks down, assigns workers,
+      executes, and pauses only at approval gates.
+- [x] MissionPlan + MissionStage pipeline; advance / approve / reject.
+- [x] Founder Mode (cockpit) vs Advanced Mode (full tabs); mission remembers it.
+- [x] Launch hero on Mission Control; outcome-first framing.
+- [ ] Real planning/breakdown via an LLM (currently heuristic, deterministic).
+- [ ] Auto-advance via BullMQ so the brain runs without a "Continue" nudge.
+- [ ] Auto-route executions to a connected machine (Runtime) end to end.
+- [ ] Cost/risk budgets that pause the brain automatically.
+
 ## 🖥️ Runtime Layer (shipped — see docs/RUNTIME_LAYER.md)
 
 - [x] Mission-agnostic runtime abstractions (host, runtime, session, command,

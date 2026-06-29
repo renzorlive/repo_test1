@@ -203,6 +203,26 @@ PATCH /api/.../missions/:id/approvals/:approvalId
 
 ---
 
+## 4a-bis. The Autonomous Mission System (the product)
+
+**Outcome-first, not AI-first.** A founder states one objective ("Launch GOCO
+Marketplace") and the **Mission Brain** (`missionBrainService`) does everything:
+plan → architecture → task breakdown → choose workers → execute → review → fix
+→ commit → deploy → release notes → done. The user only **approves**.
+
+- `MissionPlan` + `MissionStage[]` model the autonomous pipeline; the brain
+  advances stages, pausing at approval gates (Review, Deploy).
+- The brain reuses existing seams (worker registry, execution engine, runtime
+  bridge, context/prompt builders) — **no new infrastructure**, pure
+  orchestration attributed to "Mission Brain" on the timeline.
+- **Founder Mode** hides all infrastructure (the cockpit: pipeline + narration +
+  deliverables + one Approve button). **Advanced Mode** exposes every tab.
+  `Mission.mode` remembers the choice; `Mission.autonomy` sets how far it runs.
+
+Full design: `docs/AUTONOMOUS_MISSION.md`.
+
+---
+
 ## 4b. The AI Orchestrator ("Kubernetes for AI workers")
 
 The orchestrator coordinates many AI workers running thousands of executions
