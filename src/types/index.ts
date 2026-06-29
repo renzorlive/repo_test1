@@ -39,6 +39,17 @@ export type {
   AiExecutionEvent,
   AiExecutionLog,
   AiExecutionArtifact,
+  // Runtime Layer entities
+  RuntimeHost,
+  Runtime,
+  RuntimeCapability,
+  RuntimeSession,
+  RuntimeCommand,
+  RuntimeExecution,
+  RuntimeHeartbeat,
+  RuntimeArtifact,
+  RuntimeLog,
+  RuntimeTerminal,
   // Enums
   Role,
   ProjectStatus,
@@ -67,6 +78,16 @@ export type {
   AiExecutionEventType,
   AiQueueStatus,
   AiLogLevel,
+  RuntimeType,
+  RuntimeStatus,
+  HostStatus,
+  RuntimeSessionStatus,
+  RuntimeExecutionStatus,
+  RuntimeCapabilityKind,
+  RuntimeLogStream,
+  RuntimeArtifactChange,
+  RuntimeArtifactKind,
+  RuntimeTerminalStatus,
 } from "@prisma/client";
 
 /** Generic paginated result wrapper returned by list services. */

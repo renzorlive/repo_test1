@@ -15,6 +15,20 @@ group.
 - [ ] SSE live timeline (replace 2.5s polling in `useExecution`).
 - [ ] Persist the chosen goal preset / multi-worker fan-out executions.
 
+## 🖥️ Runtime Layer (shipped — see docs/RUNTIME_LAYER.md)
+
+- [x] Mission-agnostic runtime abstractions (host, runtime, session, command,
+      execution, heartbeat, artifact, log, terminal, capability).
+- [x] RuntimeAdapter interface + Claude Code adapter (Runtime #1).
+- [x] Generic job state machine + token-authenticated remote-agent protocol.
+- [x] Host Dashboard, live terminal, "Run on machine", connect-machine token.
+- [x] Bridge: runtime results → mission artifacts + timeline.
+- [ ] Ship the actual `rnz-agent` binary (claims jobs, runs Claude Code, reports).
+- [ ] Activate BullMQ for runtime dispatch + stale-session reaping.
+- [ ] SSE streaming for the terminal (replace 2s polling).
+- [ ] Additional adapters: Codex CLI, Gemini CLI, Cursor CLI, Docker, SSH.
+- [ ] Secret-scoped agent tokens with rotation + revocation.
+
 ## 🔐 Auth & access control
 
 - [ ] OAuth providers (GitHub, Google) alongside credentials.

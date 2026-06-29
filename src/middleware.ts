@@ -6,7 +6,10 @@ import { authConfig } from "@/lib/auth.config";
 export const { auth: middleware } = NextAuth(authConfig);
 
 export const config = {
-  // Run on everything except static assets, the Next internals, and the
-  // Auth.js API routes (which must remain publicly reachable).
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+  // Run on everything except static assets, Next internals, the Auth.js API
+  // routes, and the runtime agent protocol (machines authenticate with a
+  // session token, not a user session — see `requireRuntimeSession`).
+  matcher: [
+    "/((?!api/auth|api/runtime/agent|_next/static|_next/image|favicon.ico|.*\\..*).*)",
+  ],
 };

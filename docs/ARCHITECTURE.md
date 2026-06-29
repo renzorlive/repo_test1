@@ -279,6 +279,37 @@ query, with approve/reject/retry actions.
 
 ---
 
+## 4c. The Runtime Layer (distributed remote workers)
+
+RNZ OS executes real work by treating runtimes as **remote workers on other
+machines**. Claude Code is Runtime #1. The layer is deliberately
+**mission-agnostic** — see `docs/RUNTIME_LAYER.md` for the full design.
+
+```
+Mission → Execution Plan → Runtime → Claude Code Worker → Execution Events → Mission Timeline
+```
+
+- **Abstractions first**: `RuntimeHost`, `Runtime`, `RuntimeCapability`,
+  `RuntimeSession`, `RuntimeCommand`, `RuntimeExecution`, `RuntimeHeartbeat`,
+  `RuntimeArtifact`, `RuntimeLog`, `RuntimeTerminal`.
+- **Adapter interface** (`server/runtime/adapter.ts`): the engine speaks only
+  this. `ClaudeCodeRuntimeAdapter` handles dispatch/cancel; Codex/Gemini/
+  Cursor/local/Docker/SSH slot in behind it.
+- **Generic job state machine** (`runtime-engine.ts`):
+  `PENDING → DISPATCHED → RUNNING → SUCCEEDED | FAILED | CANCELLED | TIMED_OUT`.
+- **Remote-agent protocol** (`/api/runtime/agent/*`): token-authenticated
+  (`x-runtime-token`), **excluded from user auth** in `middleware.ts`. A machine
+  connects, claims jobs, and streams logs/artifacts/heartbeats/exit code back.
+- **The bridge** (`runtime-bridge.service.ts`): the only code aware of both
+  layers. It sends an AI execution to a host as a generic job, and on
+  completion stores runtime artifacts as mission artifacts and writes the
+  mission timeline. The runtime never imports it.
+
+Strict layering holds: `Repository → Service → Runtime Engine → Adapter →
+(remote agent)`. No business logic in the engine knows about missions.
+
+---
+
 ## 5. Background jobs (prepared, not active)
 
 `lib/queue.ts` sets up a lazy BullMQ connection and a queue registry

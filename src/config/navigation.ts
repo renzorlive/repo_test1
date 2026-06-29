@@ -6,6 +6,7 @@ import {
   Bot,
   Cpu,
   Inbox,
+  MonitorSmartphone,
   Settings,
 } from "lucide-react";
 
@@ -53,6 +54,12 @@ export const primaryNav: NavItem[] = [
     href: "/inbox",
     icon: Inbox,
     description: "Approvals, failures and execution triage.",
+  },
+  {
+    title: "Machines",
+    href: "/machines",
+    icon: MonitorSmartphone,
+    description: "Connected hosts running Claude Code and other runtimes.",
   },
   {
     title: "Settings",

@@ -27,3 +27,13 @@ export type { AiInboxData } from "./ai-inbox.service";
 export { aiDashboardService } from "./ai-dashboard.service";
 export type { AiDashboardOverview } from "./ai-dashboard.service";
 export { requireAiAccess, requireExecutionAccess } from "./ai-access";
+
+// Runtime Layer
+export { runtimeHostService } from "./runtime-host.service";
+export { runtimeExecutionService } from "./runtime-execution.service";
+export { runtimeAgentService } from "./runtime-agent.service";
+export type { AgentContext } from "./runtime-agent.service";
+export { runtimeBridgeService } from "./runtime-bridge.service";
+export { runtimeDashboardService } from "./runtime-dashboard.service";
+export type { RuntimeDashboardData } from "./runtime-dashboard.service";
+export { requireRuntimeAccess, requireRuntimeSession } from "./runtime-access";

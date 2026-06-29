@@ -276,6 +276,90 @@ enum AiLogLevel {
   ERROR
 }
 
+// ---- Runtime Layer enums ----------------------------------------------------
+
+/// The kind of remote worker a runtime speaks to. Claude Code is Runtime #1;
+/// the rest are placeholders the abstraction already supports.
+enum RuntimeType {
+  CLAUDE_CODE
+  CODEX_CLI
+  GEMINI_CLI
+  CURSOR_CLI
+  LOCAL_AGENT
+  DOCKER
+  SSH
+}
+
+enum RuntimeStatus {
+  OFFLINE
+  CONNECTING
+  ONLINE
+  BUSY
+  DRAINING
+  ERROR
+}
+
+enum HostStatus {
+  OFFLINE
+  ONLINE
+  BUSY
+  UNREACHABLE
+}
+
+enum RuntimeSessionStatus {
+  CONNECTING
+  CONNECTED
+  DISCONNECTED
+  EXPIRED
+}
+
+/// Generic job lifecycle — no mission vocabulary. A runtime only ever runs jobs.
+enum RuntimeExecutionStatus {
+  PENDING
+  DISPATCHED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  TIMED_OUT
+}
+
+enum RuntimeCapabilityKind {
+  SHELL
+  FILE_SYSTEM
+  GIT
+  CODE_EXECUTION
+  BROWSER
+  DOCKER
+  GPU
+  NETWORK
+}
+
+enum RuntimeLogStream {
+  STDOUT
+  STDERR
+  SYSTEM
+}
+
+enum RuntimeArtifactChange {
+  CREATED
+  MODIFIED
+  DELETED
+}
+
+enum RuntimeArtifactKind {
+  FILE
+  TEST_REPORT
+  LOG
+  DIFF
+  OTHER
+}
+
+enum RuntimeTerminalStatus {
+  OPEN
+  CLOSED
+}
+
 // ----------------------------------------------------------------------------
 // Identity & tenancy
 // ----------------------------------------------------------------------------
@@ -302,6 +386,13 @@ model Workspace {
   aiExecutions   AiExecution[]
   aiCosts        AiCost[]
   aiUsages       AiUsage[]
+
+  // Runtime Layer
+  runtimeHosts        RuntimeHost[]
+  runtimes            Runtime[]
+  runtimeCapabilities RuntimeCapability[]
+  runtimeCommands     RuntimeCommand[]
+  runtimeExecutions   RuntimeExecution[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -984,13 +1075,14 @@ model AiExecution {
   queue       AiQueue?  @relation(fields: [queueId], references: [id], onDelete: SetNull)
   requestedBy User?     @relation("ExecutionRequester", fields: [requestedById], references: [id], onDelete: SetNull)
 
-  prompts   AiPrompt[]
-  result    AiResult?
-  cost      AiCost?
-  usage     AiUsage?
-  events    AiExecutionEvent[]
-  logs      AiExecutionLog[]
-  artifacts AiExecutionArtifact[]
+  prompts           AiPrompt[]
+  result            AiResult?
+  cost              AiCost?
+  usage             AiUsage?
+  events            AiExecutionEvent[]
+  logs              AiExecutionLog[]
+  artifacts         AiExecutionArtifact[]
+  runtimeExecutions RuntimeExecution[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1130,6 +1222,248 @@ model AiExecutionArtifact {
 
   @@index([executionId])
   @@map("ai_execution_artifacts")
+}
+
+// ----------------------------------------------------------------------------
+// Runtime Layer — generic remote workers (Claude Code is Runtime #1)
+//
+// This layer is deliberately mission-agnostic: a Runtime runs generic jobs
+// (RuntimeCommand) on a RuntimeHost via a RuntimeSession, streaming logs,
+// heartbeats and artifacts back. The only bridge to the rest of RNZ OS is the
+// optional `aiExecutionId` on RuntimeExecution — set by the orchestrator, never
+// read by the runtime adapter.
+// ----------------------------------------------------------------------------
+
+/// A machine RNZ OS can run work on.
+model RuntimeHost {
+  id           String     @id @default(cuid())
+  workspaceId  String     @map("workspace_id")
+  name         String // friendly name, e.g. "Andrei's MacBook Pro"
+  hostname     String
+  os           String // e.g. "macOS 15.1", "Ubuntu 24.04"
+  arch         String? // e.g. "arm64", "x86_64"
+  cpuCores     Int        @default(1) @map("cpu_cores")
+  cpuModel     String?    @map("cpu_model")
+  memoryMb     Int        @default(0) @map("memory_mb")
+  gpu          String?
+  status       HostStatus @default(OFFLINE)
+  agentVersion String?    @map("agent_version")
+  lastSeenAt   DateTime?  @map("last_seen_at")
+  metadata     Json       @default("{}")
+
+  workspace  Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runtimes   Runtime[]
+  sessions   RuntimeSession[]
+  heartbeats RuntimeHeartbeat[]
+  executions RuntimeExecution[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@map("runtime_hosts")
+}
+
+/// A runtime instance registered on a host (e.g. a Claude Code worker).
+model Runtime {
+  id             String        @id @default(cuid())
+  workspaceId    String        @map("workspace_id")
+  hostId         String        @map("host_id")
+  type           RuntimeType
+  name           String
+  version        String?
+  status         RuntimeStatus @default(OFFLINE)
+  maxConcurrency Int           @default(1) @map("max_concurrency")
+  config         Json          @default("{}")
+
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  host         RuntimeHost         @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  capabilities RuntimeCapability[] @relation("RuntimeCapabilities")
+  sessions     RuntimeSession[]
+  executions   RuntimeExecution[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([hostId])
+  @@index([workspaceId, type, status])
+  @@map("runtimes")
+}
+
+model RuntimeCapability {
+  id          String                @id @default(cuid())
+  workspaceId String                @map("workspace_id")
+  kind        RuntimeCapabilityKind
+  name        String
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runtimes  Runtime[] @relation("RuntimeCapabilities")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([workspaceId, kind])
+  @@index([workspaceId])
+  @@map("runtime_capabilities")
+}
+
+/// A connection session between RNZ OS and a remote agent. The agent
+/// authenticates every callback with `token`.
+model RuntimeSession {
+  id              String               @id @default(cuid())
+  runtimeId       String               @map("runtime_id")
+  hostId          String               @map("host_id")
+  token           String               @unique
+  status          RuntimeSessionStatus @default(CONNECTING)
+  startedAt       DateTime             @default(now()) @map("started_at")
+  lastHeartbeatAt DateTime?            @map("last_heartbeat_at")
+  endedAt         DateTime?            @map("ended_at")
+  metadata        Json                 @default("{}")
+
+  runtime    Runtime            @relation(fields: [runtimeId], references: [id], onDelete: Cascade)
+  host       RuntimeHost        @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  executions RuntimeExecution[]
+
+  @@index([runtimeId])
+  @@index([status])
+  @@map("runtime_sessions")
+}
+
+/// A generic job specification — what to run. No mission vocabulary.
+model RuntimeCommand {
+  id          String  @id @default(cuid())
+  workspaceId String  @map("workspace_id")
+  name        String
+  command     String // e.g. "claude", "bash"
+  args        Json    @default("[]") // string[]
+  cwd         String?
+  env         Json    @default("{}")
+  // For AI runtimes (e.g. Claude Code) the prompt to run, provider-agnostic.
+  prompt      String?
+  timeoutMs   Int     @default(600000) @map("timeout_ms")
+
+  workspace  Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  executions RuntimeExecution[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@map("runtime_commands")
+}
+
+/// A run of a command on a runtime. The generic job instance.
+model RuntimeExecution {
+  id            String  @id @default(cuid())
+  workspaceId   String  @map("workspace_id")
+  commandId     String  @map("command_id")
+  runtimeId     String? @map("runtime_id")
+  hostId        String? @map("host_id")
+  sessionId     String? @map("session_id")
+  // The ONLY bridge to orchestration. Set by RNZ OS, ignored by the runtime.
+  aiExecutionId String? @map("ai_execution_id")
+
+  status      RuntimeExecutionStatus @default(PENDING)
+  exitCode    Int?                   @map("exit_code")
+  error       String?
+  attempt     Int                    @default(1)
+  maxAttempts Int                    @default(1) @map("max_attempts")
+
+  queuedAt        DateTime  @default(now()) @map("queued_at")
+  dispatchedAt    DateTime? @map("dispatched_at")
+  startedAt       DateTime? @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  lastHeartbeatAt DateTime? @map("last_heartbeat_at")
+  cancelRequested Boolean   @default(false) @map("cancel_requested")
+
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  command     RuntimeCommand  @relation(fields: [commandId], references: [id], onDelete: Cascade)
+  runtime     Runtime?        @relation(fields: [runtimeId], references: [id], onDelete: SetNull)
+  host        RuntimeHost?    @relation(fields: [hostId], references: [id], onDelete: SetNull)
+  session     RuntimeSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  aiExecution AiExecution?    @relation(fields: [aiExecutionId], references: [id], onDelete: SetNull)
+
+  logs       RuntimeLog[]
+  artifacts  RuntimeArtifact[]
+  heartbeats RuntimeHeartbeat[]
+  terminal   RuntimeTerminal?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@index([runtimeId])
+  @@index([hostId])
+  @@index([aiExecutionId])
+  @@map("runtime_executions")
+}
+
+model RuntimeHeartbeat {
+  id          String   @id @default(cuid())
+  hostId      String?  @map("host_id")
+  executionId String?  @map("execution_id")
+  cpuPct      Float?   @map("cpu_pct")
+  memMb       Int?     @map("mem_mb")
+  message     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  host      RuntimeHost?      @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  execution RuntimeExecution? @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([hostId, createdAt])
+  @@index([executionId, createdAt])
+  @@map("runtime_heartbeats")
+}
+
+/// A file/output the runtime produced. Auto-detected change set.
+model RuntimeArtifact {
+  id                String                @id @default(cuid())
+  executionId       String                @map("execution_id")
+  path              String
+  change            RuntimeArtifactChange @default(MODIFIED)
+  kind              RuntimeArtifactKind   @default(FILE)
+  sizeBytes         Int?                  @map("size_bytes")
+  url               String?
+  content           Json                  @default("{}")
+  // Set once copied into the mission's artifact store (orchestration side).
+  missionArtifactId String?               @map("mission_artifact_id")
+
+  execution RuntimeExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([executionId])
+  @@map("runtime_artifacts")
+}
+
+model RuntimeLog {
+  id          String           @id @default(cuid())
+  executionId String           @map("execution_id")
+  stream      RuntimeLogStream @default(STDOUT)
+  sequence    Int              @default(0)
+  content     String
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  execution RuntimeExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId, sequence])
+  @@map("runtime_logs")
+}
+
+/// A live terminal attached to a runtime execution (1:1).
+model RuntimeTerminal {
+  id          String                @id @default(cuid())
+  executionId String                @unique @map("execution_id")
+  status      RuntimeTerminalStatus @default(OPEN)
+  cols        Int                   @default(80)
+  rows        Int                   @default(24)
+  exitCode    Int?                  @map("exit_code")
+  startedAt   DateTime              @default(now()) @map("started_at")
+  closedAt    DateTime?             @map("closed_at")
+
+  execution RuntimeExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@map("runtime_terminals")
 }
 
 // ----------------------------------------------------------------------------

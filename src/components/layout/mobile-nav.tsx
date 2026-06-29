@@ -2,16 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Target, Inbox, Cpu, Settings } from "lucide-react";
+import {
+  LayoutDashboard,
+  Target,
+  Inbox,
+  Cpu,
+  MonitorSmartphone,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // The five founder-critical destinations, reachable in a single tap on mobile.
+// "Machines" is here so you can see your home PC and run work from your phone.
 const items = [
   { title: "Control", href: "/command-center", icon: LayoutDashboard },
   { title: "Missions", href: "/missions", icon: Target },
+  { title: "Machines", href: "/machines", icon: MonitorSmartphone },
   { title: "Inbox", href: "/inbox", icon: Inbox },
   { title: "AI", href: "/orchestrator", icon: Cpu },
-  { title: "Settings", href: "/settings", icon: Settings },
 ];
 
 /** Fixed bottom tab bar shown only on small screens. */

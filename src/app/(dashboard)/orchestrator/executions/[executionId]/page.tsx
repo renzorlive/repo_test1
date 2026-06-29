@@ -3,9 +3,15 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowLeft, Coins, Hash, Cpu } from "lucide-react";
 import { getActiveWorkspace } from "@/lib/active-workspace";
-import { requireMembership, aiExecutionService } from "@/server/services";
+import {
+  requireMembership,
+  aiExecutionService,
+  runtimeHostService,
+} from "@/server/services";
 import { aiPolicy } from "@/server/policies/ai.policy";
+import { runtimePolicy } from "@/server/policies/runtime.policy";
 import { AppError } from "@/server/errors";
+import { RunOnMachine } from "@/components/runtime/run-on-machine";
 import {
   Card,
   CardContent,
@@ -40,6 +46,10 @@ export default async function ExecutionDetailPage({
   try {
     const exec = await aiExecutionService.getAggregate(workspace.id, executionId);
     const latestPrompt = exec.prompts[0];
+    const canOperateRuntime = runtimePolicy.canOperate(membership.role);
+    const hosts = canOperateRuntime
+      ? await runtimeHostService.list(workspace.id)
+      : [];
 
     return (
       <div className="space-y-6">
@@ -76,13 +86,26 @@ export default async function ExecutionDetailPage({
               </p>
             )}
           </div>
-          <ExecutionActions
-            workspaceId={workspace.id}
-            executionId={exec.id}
-            state={exec.state}
-            canApprove={aiPolicy.canApprove(membership.role)}
-            canRun={aiPolicy.canRun(membership.role)}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            {canOperateRuntime && (
+              <RunOnMachine
+                workspaceId={workspace.id}
+                aiExecutionId={exec.id}
+                hosts={hosts.map((h) => ({
+                  id: h.id,
+                  name: h.name,
+                  status: h.status,
+                }))}
+              />
+            )}
+            <ExecutionActions
+              workspaceId={workspace.id}
+              executionId={exec.id}
+              state={exec.state}
+              canApprove={aiPolicy.canApprove(membership.role)}
+              canRun={aiPolicy.canRun(membership.role)}
+            />
+          </div>
         </div>
 
         {/* Stats */}

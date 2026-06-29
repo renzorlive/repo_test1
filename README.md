@@ -68,7 +68,8 @@ npm run dev                 # http://localhost:3000
 `/login` · `/register` · `/command-center` (Mission Control) · `/projects` ·
 `/missions` · `/missions/[id]` (Mission Workspace) · `/missions/[id]/execute`
 (Execution Wizard) · `/agents` · `/orchestrator` (AI Orchestrator) ·
-`/orchestrator/executions/[id]` · `/inbox` (AI Inbox) · `/settings`
+`/orchestrator/executions/[id]` · `/inbox` (AI Inbox) · `/machines` (Host
+Dashboard) · `/machines/executions/[id]` (Live Terminal) · `/settings`
 
 ## 📐 Design principles
 

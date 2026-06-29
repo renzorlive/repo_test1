@@ -321,7 +321,7 @@ async function main() {
   });
 
   // A completed execution with full accounting + timeline.
-  await prisma.aiExecution.create({
+  const completedAiExecution = await prisma.aiExecution.create({
     data: {
       workspaceId: workspace.id,
       title: "Generate Prisma schema for Mission Engine",
@@ -428,6 +428,108 @@ async function main() {
       queueId: queue.id,
       requestedById: user.id,
       events: { create: [{ type: "QUEUED", message: "Execution queued" }] },
+    },
+  });
+
+  // ---- Runtime Layer -------------------------------------------------------
+  const host = await prisma.runtimeHost.create({
+    data: {
+      workspaceId: workspace.id,
+      name: "Andrei's MacBook Pro",
+      hostname: "andrei-mbp.local",
+      os: "macOS 15.1",
+      arch: "arm64",
+      cpuCores: 12,
+      cpuModel: "Apple M3 Pro",
+      memoryMb: 36864,
+      gpu: "Apple M3 Pro GPU",
+      status: "ONLINE",
+      agentVersion: "0.4.0",
+      lastSeenAt: new Date(),
+    },
+  });
+
+  const runtimeCapKinds = ["SHELL", "FILE_SYSTEM", "GIT", "CODE_EXECUTION"] as const;
+  const runtimeCaps: Record<string, { id: string }> = {};
+  for (const kind of runtimeCapKinds) {
+    runtimeCaps[kind] = await prisma.runtimeCapability.create({
+      data: {
+        workspaceId: workspace.id,
+        kind,
+        name: kind
+          .toLowerCase()
+          .split("_")
+          .map((w) => w[0]!.toUpperCase() + w.slice(1))
+          .join(" "),
+      },
+    });
+  }
+
+  const runtime = await prisma.runtime.create({
+    data: {
+      workspaceId: workspace.id,
+      hostId: host.id,
+      type: "CLAUDE_CODE",
+      name: "Claude Code @ Andrei's MacBook Pro",
+      version: "claude-code 1.0",
+      status: "ONLINE",
+      maxConcurrency: 2,
+      capabilities: { connect: runtimeCapKinds.map((k) => ({ id: runtimeCaps[k]!.id })) },
+    },
+  });
+
+  const runtimeSession = await prisma.runtimeSession.create({
+    data: {
+      runtimeId: runtime.id,
+      hostId: host.id,
+      token: `rnz_demo_${Date.now().toString(36)}`,
+      status: "CONNECTED",
+      lastHeartbeatAt: new Date(),
+    },
+  });
+
+  // A finished Claude Code job, bridged to the completed AI execution.
+  await prisma.runtimeExecution.create({
+    data: {
+      workspace: { connect: { id: workspace.id } },
+      runtime: { connect: { id: runtime.id } },
+      host: { connect: { id: host.id } },
+      session: { connect: { id: runtimeSession.id } },
+      aiExecution: { connect: { id: completedAiExecution.id } },
+      status: "SUCCEEDED",
+      exitCode: 0,
+      dispatchedAt: daysFromNow(-7),
+      startedAt: daysFromNow(-7),
+      finishedAt: daysFromNow(-7),
+      command: {
+        create: {
+          workspace: { connect: { id: workspace.id } },
+          name: "Implement Mission Engine schema",
+          command: "claude",
+          args: ["-p"],
+          prompt: "Design and implement the Mission Engine Prisma schema.",
+          timeoutMs: 600000,
+        },
+      },
+      terminal: { create: { status: "CLOSED", exitCode: 0, closedAt: daysFromNow(-7) } },
+      logs: {
+        create: [
+          { sequence: 0, stream: "SYSTEM", content: "Job dispatched to Claude Code. Awaiting agent." },
+          { sequence: 1, stream: "SYSTEM", content: 'Agent claimed job — execution started.' },
+          { sequence: 2, stream: "STDOUT", content: "Reading mission context…" },
+          { sequence: 3, stream: "STDOUT", content: "Editing prisma/schema.prisma" },
+          { sequence: 4, stream: "STDOUT", content: "Adding 9 models and 8 enums" },
+          { sequence: 5, stream: "STDERR", content: "warn: prisma format reordered relations" },
+          { sequence: 6, stream: "SYSTEM", content: "Detected 2 artifact change(s)." },
+          { sequence: 7, stream: "SYSTEM", content: "Process exited with code 0." },
+        ],
+      },
+      artifacts: {
+        create: [
+          { path: "prisma/schema.prisma", change: "MODIFIED", kind: "FILE", sizeBytes: 18240 },
+          { path: "prisma/migrations/20260628_mission/migration.sql", change: "CREATED", kind: "FILE", sizeBytes: 9120 },
+        ],
+      },
     },
   });
 

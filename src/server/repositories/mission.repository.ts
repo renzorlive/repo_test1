@@ -163,6 +163,10 @@ export const missionRepository = {
     return prisma.missionTimeline.create({ data });
   },
 
+  createArtifact(data: Prisma.ArtifactCreateInput) {
+    return prisma.artifact.create({ data });
+  },
+
   nextMilestonePosition(missionId: string) {
     return prisma.missionTimeline.count({ where: { missionId } });
   },

@@ -28,3 +28,13 @@ export type {
 export { aiDashboardRepository } from "./ai-dashboard.repository";
 export { aiInboxRepository, INBOX_THRESHOLDS } from "./ai-inbox.repository";
 export type { InboxExecution } from "./ai-inbox.repository";
+
+// Runtime Layer
+export { runtimeHostRepository } from "./runtime-host.repository";
+export type { RuntimeHostWithRuntimes } from "./runtime-host.repository";
+export { runtimeRepository } from "./runtime.repository";
+export { runtimeExecutionRepository } from "./runtime-execution.repository";
+export type {
+  RuntimeExecutionAggregate,
+  RuntimeExecutionListItem,
+} from "./runtime-execution.repository";

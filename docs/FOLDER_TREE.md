@@ -172,3 +172,36 @@ src/
 │       └── mission-control.service.ts          # Homepage aggregate
 └── hooks/use-execution.ts                       # Live execution polling
 ```
+
+## Runtime Layer additions (distributed remote workers)
+
+```
+src/
+├── server/
+│   ├── runtime/
+│   │   ├── runtime-engine.ts                    # Generic job state machine
+│   │   ├── adapter.ts                           # RuntimeAdapter interface + registry
+│   │   ├── adapters/claude-code.ts              # Runtime #1 (mission-agnostic)
+│   │   └── types.ts                             # Generic job/log/artifact types
+│   ├── controllers/
+│   │   ├── runtime.controller.ts                # User-facing HTTP↔service
+│   │   └── runtime-agent.controller.ts          # Token-authed agent protocol
+│   ├── policies/runtime.policy.ts
+│   ├── services/
+│   │   ├── runtime-host.service.ts              # Register/list machines
+│   │   ├── runtime-execution.service.ts         # Dispatch/cancel/retry jobs
+│   │   ├── runtime-agent.service.ts             # connect/heartbeat/claim/report
+│   │   ├── runtime-bridge.service.ts            # Runtime ↔ AI/mission glue
+│   │   ├── runtime-dashboard.service.ts         # Host Dashboard aggregate
+│   │   └── runtime-access.ts                    # User guard + agent token auth
+│   └── repositories/runtime-{host,,execution}.repository.ts
+├── app/
+│   ├── api/runtime/agent/{connect,heartbeat,claim,report}/route.ts   # Agent protocol
+│   ├── api/workspaces/[workspaceId]/runtime/**  # hosts, executions, dashboard, dispatch
+│   └── (dashboard)/machines/                    # Host Dashboard + live terminal
+│       ├── page.tsx
+│       └── executions/[executionId]/page.tsx
+├── components/runtime/                          # host-card, live-terminal,
+│                                                # connect-machine, run-on-machine, badges
+└── hooks/use-runtime-execution.ts · use-runtime-actions.ts
+```
